@@ -58,6 +58,10 @@
 2. 等待编译完成，打开菜单 **Tools → Unity Python Bridge**（或菜单 **Tools → Unity Python Bridge → Start Server**），点击「启动服务器」，看到日志提示监听 `127.0.0.1:21927` 即成功。
    - Edit Mode 和 Play Mode 均可使用（命令在主线程执行）。
 
+> **重编译自动恢复（可选）**：把 `Runtime/BridgeManager.cs` 组件挂到场景任意物体上，Inspector 会显示「启动/停止服务器」按钮；
+> 服务器状态会持久化到 `Library/BridgeServerState.txt`——**触发脚本重编译或重新打开项目后，自动按该状态恢复**（无需手动重启）。
+> 菜单 Start/Stop 也会同步写入该状态。若不需要自动恢复，忽略此组件即可。
+
 ### 2. Python 侧
 
 ```bash

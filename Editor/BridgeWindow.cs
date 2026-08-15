@@ -24,6 +24,7 @@ namespace UnityPythonBridge.EditorTools
         public static void StartServerFromMenu()
         {
             BridgeServer.Start();
+            BridgeAutoRestart.SaveState(true);
             var w = GetWindow<BridgeWindow>("Unity Python Bridge");
             w.Repaint();
         }
@@ -32,6 +33,7 @@ namespace UnityPythonBridge.EditorTools
         public static void StopServerFromMenu()
         {
             BridgeServer.Stop();
+            BridgeAutoRestart.SaveState(false);
             var w = GetWindow<BridgeWindow>("Unity Python Bridge");
             w.Repaint();
         }
@@ -87,6 +89,7 @@ namespace UnityPythonBridge.EditorTools
                     if (GUILayout.Button("启动服务器"))
                     {
                         BridgeServer.Start(_port);
+                        BridgeAutoRestart.SaveState(true);
                         Log("启动服务器 @ 127.0.0.1:" + _port);
                     }
                 }
@@ -95,6 +98,7 @@ namespace UnityPythonBridge.EditorTools
                     if (GUILayout.Button("停止服务器"))
                     {
                         BridgeServer.Stop();
+                        BridgeAutoRestart.SaveState(false);
                         Log("停止服务器");
                     }
                 }
