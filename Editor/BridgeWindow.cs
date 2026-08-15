@@ -36,6 +36,14 @@ namespace UnityPythonBridge.EditorTools
             w.Repaint();
         }
 
+        [MenuItem("Tools/Unity Python Bridge/打印版本信息", false, 22)]
+        public static void PrintVersionFromMenu()
+        {
+            BridgeInfo.PrintVersion();
+            var w = GetWindow<BridgeWindow>("Unity Python Bridge");
+            w.Repaint();
+        }
+
         private void OnEnable()
         {
             EditorApplication.update += OnEditorUpdate;

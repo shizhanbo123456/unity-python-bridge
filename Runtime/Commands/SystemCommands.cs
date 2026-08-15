@@ -57,6 +57,12 @@ namespace UnityPythonBridge.Commands
             result.count = result.commands.Count;
             return result;
         }
+
+        [BridgeCommand("bridge.version", "返回桥接层版本号与命令统计，用于确认 Unity 侧代码是否为最新")]
+        public static object Version(BridgeContext ctx, BridgeArgs args)
+        {
+            return BridgeInfo.GetVersionInfo();
+        }
     }
 }
 #endif // UNITY_EDITOR

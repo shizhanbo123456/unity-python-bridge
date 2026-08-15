@@ -113,6 +113,9 @@ python -m unity_bridge tree --components
 | `prefab.screenshot` | 资源查询 | 隔离复制 prefab 到 `(9999,9999,9999)` + 相机环绕 `LookAt` 渲染存 PNG（支持正交/透视、`fov`、`bg`、补光） | `screenshot`（`shot`） | `path`、`output`(.png)、`offset`("x,y,z")、`orthographic`、`fov`、`width`、`height`、`bg`、`light` |
 | `bridge.ping` | 系统 | 连通性测试，返回 `pong` + 服务器时间 | 无专用子命令（`client.ping()` / `client.call("bridge.ping")` / 原始 TCP） | 无 |
 | `bridge.list_commands` | 系统 | 列出所有已注册命令 | `list`（`ls`） | 无 |
+| `bridge.version` | 系统 | 返回桥接层版本号与命令统计，确认 Unity 侧代码是否为最新 | `version`（`ver`/`v`） | 无 |
+
+> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询。当前版本 **v1.2.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具）。
 
 ### B. Terrain 程序化编辑命令（12 条，Unity 原生 TerrainData API）
 
@@ -359,6 +362,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │   ├── BridgeCommandAttribute.cs   # [BridgeCommand] 命令特性
 │   ├── BridgeContext.cs            # 执行上下文 + BridgeArgs 强类型参数 + 委托定义
 │   ├── BridgeDispatcher.cs         # 反射扫描 + 命令分发
+│   ├── BridgeInfo.cs               # 版本号与命令统计（菜单"打印版本信息" / bridge.version）
 │   ├── BridgeServer.cs             # TCP 服务器（单行 JSON 协议，JsonUtility）
 │   ├── MainThreadRunner.cs         # 主线程执行队列
 │   └── Commands/

@@ -83,6 +83,18 @@ def _cmd_list(args) -> int:
     return 0
 
 
+def _cmd_version(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.call("bridge.version")
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"version            : v{data.get('version')}")
+    print(f"commandCount       : {data.get('commandCount')}")
+    print(f"terrainCommandCount: {data.get('terrainCommandCount')}")
+    return 0
+
+
 def _cmd_mesh_bounds(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.mesh_bounds(args.path)
@@ -369,6 +381,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_list = sub.add_parser("list", aliases=["ls"], help="列出 Unity 侧所有已注册的命令")
     p_list.set_defaults(func=_cmd_list)
+
+    p_ver = sub.add_parser("version", aliases=["ver", "v"],
+                           help="显示 Unity 侧桥接层版本号与命令统计（确认是否最新）")
+    p_ver.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_ver.set_defaults(func=_cmd_version)
 
     p_bounds = sub.add_parser(
         "mesh-bounds", aliases=["bounds"],
