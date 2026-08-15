@@ -1,0 +1,14 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 编辑器/系统杂项
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 输出目录（截图等临时产物）
+out/
+python/out/
