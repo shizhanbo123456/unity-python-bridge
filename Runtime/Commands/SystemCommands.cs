@@ -21,6 +21,18 @@ namespace UnityPythonBridge.Commands
         public string description;
     }
 
+    /// <summary>
+    /// bridge.list_commands 返回结构。
+    /// 注意：不能直接返回顶层 List&lt;CommandInfo&gt;——JsonUtility.ToJson 对顶层 List
+    /// 会序列化失败（退化为 {}），必须包一层 [Serializable] 类。
+    /// </summary>
+    [System.Serializable]
+    public class CommandListResult
+    {
+        public int count;
+        public List<CommandInfo> commands = new List<CommandInfo>();
+    }
+
     /// <summary>系统级命令：连通性测试、命令列表等。</summary>
     public static class SystemCommands
     {
@@ -37,12 +49,13 @@ namespace UnityPythonBridge.Commands
         [BridgeCommand("bridge.list_commands", "列出所有已通过反射注册的命令")]
         public static object ListCommands(BridgeContext ctx, BridgeArgs args)
         {
-            var list = new List<CommandInfo>();
+            var result = new CommandListResult();
             foreach (var kv in BridgeDispatcher.CommandMap.OrderBy(k => k.Key, StringComparer.Ordinal))
             {
-                list.Add(new CommandInfo { name = kv.Key, description = kv.Value.Description });
+                result.commands.Add(new CommandInfo { name = kv.Key, description = kv.Value.Description });
             }
-            return list;
+            result.count = result.commands.Count;
+            return result;
         }
     }
 }

@@ -102,7 +102,7 @@ def handle_client(client: socket.socket) -> None:
                 if cmd == "bridge.ping":
                     data = {"pong": True, "time": "2026-08-15T10:00:00Z"}
                 elif cmd == "bridge.list_commands":
-                    data = COMMANDS
+                    data = {"count": len(COMMANDS), "commands": COMMANDS}
                 elif cmd == "scene.tree":
                     data = json.loads(json.dumps(MOCK_SCENE))  # 深拷贝，避免污染全局
                     if not args.get("components"):

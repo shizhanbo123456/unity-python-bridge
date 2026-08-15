@@ -74,8 +74,9 @@ def _cmd_tree(args) -> int:
 
 def _cmd_list(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
-        commands = client.list_commands()
-    for c in commands:
+        data = client.list_commands()
+    commands = data.get("commands") if isinstance(data, dict) else data
+    for c in commands or []:
         name = c.get("name", "?")
         desc = c.get("description", "")
         print(f"{name:<24} {desc}")
