@@ -114,7 +114,7 @@ python -m unity_bridge tree --components
 |---|---|---|---|---|
 | `scene.tree` | 场景读取 | 树状返回当前激活场景的物体层级 | `tree` | `components`(bool, 可选，显组件类型) |
 | `mesh.bounds` | 资源查询 | 计算 Assets 中 mesh / 模型 / prefab 的轴对齐包围盒（AABB，多网格合并） | `mesh-bounds`（`bounds`） | `path`(string, Assets 相对路径) |
-| `prefab.screenshot` | 资源查询 | 隔离复制 prefab 到 `(9999,9999,9999)` + 相机环绕 `LookAt` 渲染存 PNG（支持正交/透视、`fov`、`bg`、补光）；**摄制后副本/相机/补光保留在场景中** | `screenshot`（`shot`） | `path`、`output`(.png)、`offset`("x,y,z")、`orthographic`、`fov`、`width`、`height`、`bg`、`light` |
+| `prefab.screenshot` | 资源查询 | 隔离复制 prefab 到 `(9999,9999,9999)` + 相机环绕 `LookAt` 渲染存 PNG（**旋转保持资产原有**；支持正交/透视、`fov`、`bg`、补光） | `screenshot`（`shot`） | `path`、`output`(.png)、`offset`("x,y,z")、`orthographic`、`fov`、`width`、`height`、`bg`、`light` |
 | `bridge.ping` | 系统 | 连通性测试，返回 `pong` + 服务器时间 | 无专用子命令（`client.ping()` / `client.call("bridge.ping")` / 原始 TCP） | 无 |
 | `bridge.list_commands` | 系统 | 列出所有已注册命令 | `list`（`ls`） | 无 |
 | `bridge.version` | 系统 | 返回桥接层版本号与命令统计，确认 Unity 侧代码是否为最新 | `version`（`ver`/`v`） | 无 |
@@ -272,10 +272,9 @@ python -m unity_bridge bounds Assets/Prefabs/Tree.prefab --json   # bounds 为 m
 ## 六、prefab.screenshot 命令（预制体截图）
 
 将目标预制体**复制到当前场景的隔离位置 `(9999,9999,9999)`**（远离原点，避免与场景中已有
-物体重叠/碰撞），创建一台相机移动到相对预制体的位置并 `LookAt` 看向它，渲染后保存为 PNG。
-**摄制完成后，预制体副本、相机（含补光）会保留在场景中**，方便查看/调整/手动清理——
-不再自动销毁。手动清理时删除隔离区（`9999,9999,9999` 附近）名为
-`BridgeScreenshotCamera`、`BridgeFillLight` 以及预制体名的物体即可。
+物体重叠/碰撞），创建一台相机移动到相对预制体的位置并 `LookAt` 看向它，渲染后保存为 PNG，
+**最后销毁临时复制的预制体与创建的相机**，不污染场景。
+复制出的预制体**旋转保持资产原有的**（不强制 identity），缩放统一为 1。
 
 **参数**：
 
@@ -307,19 +306,15 @@ python -m unity_bridge bounds Assets/Prefabs/Tree.prefab --json   # bounds 为 m
   "cameraPosition": { "x": 10002, "y": 10001, "z": 10004 },
   "lookAt": { "x": 9999, "y": 9999, "z": 9999 },
   "fillLight": 0,
-  "bytes": 10570,
-  "instanceName": "Tree",
-  "cameraName": "BridgeScreenshotCamera",
-  "lightName": null,
-  "position": { "x": 9999, "y": 9999, "z": 9999 }
+  "bytes": 10570
 }
 ```
 
 > 注意：截图使用**当前激活场景的灯光**渲染。若场景没有平行光，预制体可能偏暗——
 > 请确保截图时场景具备合适照明。也可直接用 `--light <强度>` 让命令临时追加一盏**rotation 与相机
 > 一致的平行光**补光（Unity 平行光光线方向即 `transform.forward`，与相机一致时从相机方向照向物体，
-> 相机指向任何方向物体正面都亮），**推荐 `--light 2`**；`light=0`（默认）则不补光。补光与相机、预制体
-> 副本一样保留在场景中，手动清理时一并删除。
+> 相机指向任何方向物体正面都亮），**推荐 `--light 2`**；`light=0`（默认）则不补光；该补光在相机
+> 渲染完成后立即销毁，不会留在场景里。
 
 ---
 

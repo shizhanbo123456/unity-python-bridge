@@ -221,10 +221,6 @@ def _cmd_screenshot(args) -> int:
     light_val = data.get("fillLight", 0)
     print(f"light  : {light_val if light_val else '无补光'}")
     print(f"bytes  : {data.get('bytes')}")
-    pos = data.get("position", {})
-    print(f"保留   : 预制体副本[{data.get('instanceName')}] 相机[{data.get('cameraName')}]"
-          + (f" 补光[{data.get('lightName')}]" if data.get("lightName") else "")
-          + f" 位置({pos.get('x')}, {pos.get('y')}, {pos.get('z')})")
     return 0
 
 
@@ -552,7 +548,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_shot = sub.add_parser(
         "screenshot", aliases=["shot"],
-        help="将预制体复制到场景隔离位置并截图保存为 PNG（摄制后预制体副本/相机/补光保留在场景中）")
+        help="将预制体复制到场景隔离位置并截图保存为 PNG（旋转保持资产原有，摄制后销毁临时对象）")
     p_shot.add_argument("path", help="目标预制体在 Assets 中的相对路径（.prefab / 模型文件）")
     p_shot.add_argument("output", help="PNG 输出路径（必须以 .png 结尾）")
     p_shot.add_argument("--offset", required=True,

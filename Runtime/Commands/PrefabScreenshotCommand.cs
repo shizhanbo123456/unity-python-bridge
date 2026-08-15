@@ -21,16 +21,12 @@ namespace UnityPythonBridge.Commands
         public Vector3 lookAt;
         public float fillLight;
         public int bytes;
-        public string instanceName;   // 保留在场景中的预制体副本名
-        public string cameraName;     // 保留在场景中的相机物体名
-        public string lightName;      // 保留在场景中的补光物体名（light>0 时）
-        public Vector3 position;      // 保留对象所在位置（隔离区）
     }
 
     /// <summary>
-    /// 预制体截图命令：把目标预制体复制到场景中的隔离位置，创建相机进行截图并保存为 PNG。
-    /// 摄制完成后【保留】预制体副本与相机（含补光）在场景中，不自动销毁——
-    /// 方便后续在场景里查看 / 调整 / 手动清理（删除隔离区的 BridgeScreenshotCamera 与副本即可）。
+    /// 预制体截图命令：把目标预制体复制到场景中的隔离位置，创建相机进行截图并保存为 PNG，
+    /// 完成后销毁临时复制的预制体与创建的相机（不污染场景）。
+    /// 复制出的预制体【旋转保持资产原有的】（不再强制 identity），缩放统一为 1。
     ///
     /// 参数（BridgeArgs）:
     ///   path (string)        - 目标预制体在 Assets 中的相对路径（.prefab 或模型文件）
@@ -44,8 +40,7 @@ namespace UnityPythonBridge.Commands
     ///   light (float)        - 补光强度，默认 0（不补光）；>0 时追加一盏与相机朝向一致的平行光
     ///
     /// 返回:
-    ///   { path, resolvedPath, output, cameraType, width, height, cameraPosition{x,y,z}, lookAt{x,y,z},
-    ///     fillLight, bytes, instanceName, cameraName, lightName, position{x,y,z} }
+    ///   { path, resolvedPath, output, cameraType, width, height, cameraPosition{x,y,z}, lookAt{x,y,z}, fillLight, bytes }
     /// </summary>
     public static class PrefabScreenshotCommand
     {
@@ -53,7 +48,7 @@ namespace UnityPythonBridge.Commands
         private static readonly Vector3 Isolation = new Vector3(9999f, 9999f, 9999f);
 
         [BridgeCommand("prefab.screenshot",
-            "将目标预制体复制到场景隔离位置并截图保存为 PNG；摄制后预制体副本/相机/补光保留在场景中。参数: path(string), offset{x,y,z}, " +
+            "将目标预制体复制到场景隔离位置并截图保存为 PNG（旋转保持资产原有，摄制后销毁临时对象）。参数: path(string), offset{x,y,z}, " +
             "output(string,.png), orthographic(bool,默认false), fov(number,默认Unity默认), " +
             "width(int,默认1920), height(int,默认1080), bg(string r,g,b,a,默认透明), " +
             "light(number,默认0不补光;>0追加与相机同向平行光)")]
@@ -93,10 +88,10 @@ namespace UnityPythonBridge.Commands
             Texture2D tex = null;
             try
             {
-                // 1) 复制到场景隔离位置（默认旋转/缩放，保证只看几何本身）
+                // 1) 复制到场景隔离位置；旋转保持 prefab 资产原有的（不强制 identity），
+                //    缩放统一为 1（只看几何本身，不受资产缩放影响）
                 instance = (GameObject)PrefabUtility.InstantiatePrefab(go);
                 instance.transform.position = Isolation;
-                instance.transform.rotation = Quaternion.identity;
                 instance.transform.localScale = Vector3.one;
 
                 // 2) 创建相机：移动到相对位置后 LookAt 预制体
@@ -149,8 +144,6 @@ namespace UnityPythonBridge.Commands
                 byte[] png = tex.EncodeToPNG();
                 File.WriteAllBytes(output, png);
 
-                // 摄制完成：预制体副本 / 相机 / 补光【保留】在场景隔离区（(9999,9999,9999) 附近），
-                // 不自动销毁，方便后续在场景中查看、调整或手动清理。
                 return new ScreenshotResult
                 {
                     path = path,
@@ -163,18 +156,16 @@ namespace UnityPythonBridge.Commands
                     lookAt = Isolation,
                     fillLight = lightIntensity > 0 ? lightIntensity : 0f,
                     bytes = png.Length,
-                    instanceName = instance.name,
-                    cameraName = camGo.name,
-                    lightName = lightGo != null ? lightGo.name : null,
-                    position = Isolation,
                 };
             }
             finally
             {
-                // 仅销毁渲染临时资源（Texture2D / RenderTexture）——它们是内存对象，不属于场景。
-                // 场景对象（预制体副本 instance / 相机 camGo / 补光 lightGo）刻意保留。
+                // 4) 无论成功与否，销毁临时对象（预制体副本/相机/补光），不污染场景
                 if (tex != null) UnityEngine.Object.DestroyImmediate(tex);
                 if (rt != null) RenderTexture.ReleaseTemporary(rt);
+                if (lightGo != null) UnityEngine.Object.DestroyImmediate(lightGo);
+                if (camGo != null) UnityEngine.Object.DestroyImmediate(camGo);
+                if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
             }
         }
 
