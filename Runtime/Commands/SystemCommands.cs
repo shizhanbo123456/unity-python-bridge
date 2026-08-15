@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEditor;
 
 namespace UnityPythonBridge.Commands
 {
@@ -11,6 +12,14 @@ namespace UnityPythonBridge.Commands
     {
         public bool pong;
         public string time;
+    }
+
+    /// <summary>bridge.reload 返回结构。</summary>
+    [System.Serializable]
+    public class ReloadResult
+    {
+        public bool requested;
+        public string message;
     }
 
     /// <summary>bridge.list_commands 返回的单个命令信息。</summary>
@@ -62,6 +71,23 @@ namespace UnityPythonBridge.Commands
         public static object Version(BridgeContext ctx, BridgeArgs args)
         {
             return BridgeInfo.GetVersionInfo();
+        }
+
+        [BridgeCommand("bridge.reload",
+            "触发 Unity 脚本重编译（domain reload），编译完成后服务器自动恢复（依赖 BridgeManager 状态持久化）。" +
+            "参数: 无。客户端应轮询 bridge.version 等待恢复")]
+        public static object Reload(BridgeContext ctx, BridgeArgs args)
+        {
+            // 确保重编译后自动恢复：先写状态"运行中"
+            BridgeAutoRestart.SaveState(true);
+            // 延迟一帧触发重编译，保证本次响应先发回客户端（否则响应会随旧域一起丢失）
+            EditorApplication.delayCall += () => EditorApplication.RequestScriptReload();
+
+            return new ReloadResult
+            {
+                requested = true,
+                message = "重编译已触发，服务器将在编译完成后自动恢复（客户端请轮询 bridge.version）"
+            };
         }
     }
 }

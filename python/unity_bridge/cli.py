@@ -9,6 +9,7 @@
     python -m unity_bridge screenshot Assets/Prefabs/Tree.prefab out/tree.png \
         --offset "3,2,5" [--orthographic] [--fov 50] [--width 1920] [--height 1080] \
         [--bg "0.2,0.2,0.2,1"] [--light 2]
+    python -m unity_bridge reload               # 触发 Unity 重编译并等待服务器恢复
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from typing import List, Optional
 
 from .client import DEFAULT_HOST, DEFAULT_PORT, UnityBridgeError, UnityClient
@@ -93,6 +95,37 @@ def _cmd_version(args) -> int:
     print(f"commandCount       : {data.get('commandCount')}")
     print(f"terrainCommandCount: {data.get('terrainCommandCount')}")
     return 0
+
+
+def _cmd_reload(args) -> int:
+    """触发 Unity 重编译，然后每 1 秒轮询 bridge.version，直到服务器恢复或超时。"""
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        result = client.reload_unity()
+    print(f"已触发: {result.get('message', 'reload requested')}")
+
+    deadline = time.time() + args.timeout
+    attempt = 0
+    while time.time() < deadline:
+        attempt += 1
+        time.sleep(args.interval)
+        try:
+            with UnityClient(args.host, args.port, timeout=min(5, args.interval + 2)) as client:
+                v = client.call("bridge.version")
+        except (UnityBridgeError, ConnectionError, OSError) as e:
+            print(f"[{attempt}] 等待中（服务器不可用）: {e}")
+            continue
+
+        ver = v.get("version", "?")
+        if args.expect_version and ver != args.expect_version:
+            print(f"[{attempt}] 版本 v{ver} != 期望 v{args.expect_version}，继续等待...")
+            continue
+
+        elapsed = time.time() - (deadline - args.timeout)
+        print(f"服务器已恢复: v{ver}，命令 {v.get('commandCount')} 条，耗时 {elapsed:.1f}s")
+        return 0
+
+    print(f"超时: {args.timeout:.0f}s 内服务器未恢复")
+    return 1
 
 
 def _cmd_mesh_bounds(args) -> int:
@@ -447,6 +480,16 @@ def build_parser() -> argparse.ArgumentParser:
                            help="显示 Unity 侧桥接层版本号与命令统计（确认是否最新）")
     p_ver.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_ver.set_defaults(func=_cmd_version)
+
+    p_reload = sub.add_parser("reload", aliases=["rl"],
+                              help="触发 Unity 重编译（domain reload），并轮询等待服务器自动恢复")
+    p_reload.add_argument("--expect-version", default=None,
+                          help="期望恢复后的版本号（可选，不匹配则继续等待）")
+    p_reload.add_argument("--timeout", type=float, default=120.0,
+                          help="总超时秒数（默认 120）")
+    p_reload.add_argument("--interval", type=float, default=1.0,
+                          help="轮询间隔秒数（默认 1）")
+    p_reload.set_defaults(func=_cmd_reload)
 
     p_bounds = sub.add_parser(
         "mesh-bounds", aliases=["bounds"],

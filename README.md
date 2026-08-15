@@ -118,8 +118,25 @@ python -m unity_bridge tree --components
 | `bridge.ping` | 系统 | 连通性测试，返回 `pong` + 服务器时间 | 无专用子命令（`client.ping()` / `client.call("bridge.ping")` / 原始 TCP） | 无 |
 | `bridge.list_commands` | 系统 | 列出所有已注册命令 | `list`（`ls`） | 无 |
 | `bridge.version` | 系统 | 返回桥接层版本号与命令统计，确认 Unity 侧代码是否为最新 | `version`（`ver`/`v`） | 无 |
+| `bridge.reload` | 系统 | 触发 Unity 脚本重编译（domain reload），编译完成后服务器自动恢复 | `reload`（`rl`） | `--expect-version`、`--timeout`、`--interval` |
 
 > **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询。当前版本 **v1.2.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具）。
+
+**触发重编译并等待恢复**：
+
+```bash
+# 触发 Unity 脚本重编译，每 1 秒轮询 bridge.version，直到服务器恢复或超时（默认 120s）
+python -m unity_bridge reload
+
+# 指定期望版本（不匹配则继续等待）
+python -m unity_bridge reload --expect-version 1.2.0
+
+# 自定义超时与轮询间隔
+python -m unity_bridge reload --timeout 180 --interval 2
+```
+
+> 原理：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `EditorApplication.RequestScriptReload()` 触发重编译；
+> 重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。
 
 ### B. Terrain 程序化编辑命令（12 条，Unity 原生 TerrainData API）
 

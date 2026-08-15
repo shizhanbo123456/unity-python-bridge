@@ -45,6 +45,7 @@ COMMANDS = [
     {"name": "bridge.ping", "description": "连通性测试，成功返回 pong 与服务器时间"},
     {"name": "bridge.list_commands", "description": "列出所有已通过反射注册的命令"},
     {"name": "bridge.version", "description": "返回桥接层版本号与命令统计，用于确认 Unity 侧代码是否为最新"},
+    {"name": "bridge.reload", "description": "触发 Unity 脚本重编译（domain reload），编译完成后服务器自动恢复"},
     {"name": "scene.tree", "description": "以树状结构返回当前场景中的物体层级。参数: components(bool)"},
     {"name": "mesh.bounds", "description": "计算 Assets 中网格/模型/预制体的轴对齐包围盒。参数: path(string)"},
     {"name": "prefab.screenshot", "description": "将预制体复制到场景隔离位置并截图保存为 PNG。参数: path(string), offset{x,y,z}, output(string,.png), orthographic(bool), fov(number), width(int), height(int), bg(string)"},
@@ -114,6 +115,9 @@ def handle_client(client: socket.socket) -> None:
                 elif cmd == "bridge.version":
                     data = {"version": "1.2.0", "commandCount": len(COMMANDS),
                             "terrainCommandCount": 12}
+                elif cmd == "bridge.reload":
+                    data = {"requested": True,
+                            "message": "[mock] 重编译已触发（模拟立即恢复）"}
                 elif cmd == "bridge.list_commands":
                     data = {"count": len(COMMANDS), "commands": COMMANDS}
                 elif cmd == "scene.tree":

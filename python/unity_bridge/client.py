@@ -94,6 +94,11 @@ class UnityClient:
     def list_commands(self):
         return self.call("bridge.list_commands")
 
+    def reload_unity(self) -> dict:
+        """触发 Unity 脚本重编译（domain reload）。触发后旧域卸载、服务器会中断，
+        重编译完成后由 BridgeAutoRestart 自动恢复；调用方应轮询等待恢复。"""
+        return self.call("bridge.reload")
+
     def scene_tree(self, components: bool = False) -> dict:
         return self.call("scene.tree", components=components)
 
