@@ -155,6 +155,10 @@ class UnityClient:
         """列出 Terrain 的纹理层（TerrainLayer）。"""
         return self.call("terrain.get_layers", terrain=terrain)
 
+    def get_diffuse_dirs(self, terrain: str = None) -> dict:
+        """返回 Terrain 所有 TerrainLayer 的 Diffuse 贴图目录（去重）及各层贴图完整路径。"""
+        return self.call("terrain.get_diffuse_dirs", terrain=terrain)
+
     def get_alphamaps(self, terrain: str = None, x_base: int = 0, z_base: int = 0,
                       width: int = 0, height: int = 0) -> dict:
         """读取纹理混合权重，data index=(y*width+x)*layers+layer。"""

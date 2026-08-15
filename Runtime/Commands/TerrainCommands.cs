@@ -72,6 +72,25 @@ namespace UnityPythonBridge.Commands
     }
 
     [Serializable]
+    public class TerrainDiffuseDirInfo
+    {
+        public int index;
+        public string name;
+        public string diffuseTexture;   // 完整贴图路径（AssetDatabase 路径）
+        public string diffuseDir;       // 贴图所在目录
+    }
+
+    [Serializable]
+    public class TerrainDiffuseDirsResult
+    {
+        public string terrain;
+        public int count;               // TerrainLayer 数量
+        public int directoryCount;      // 去重后的目录数量
+        public List<string> directories = new List<string>();          // 去重目录列表
+        public List<TerrainDiffuseDirInfo> layers = new List<TerrainDiffuseDirInfo>();
+    }
+
+    [Serializable]
     public class TerrainAlphamapResult
     {
         public string terrain;
@@ -370,6 +389,46 @@ namespace UnityPythonBridge.Commands
             return result;
         }
 
+        [BridgeCommand("terrain.get_diffuse_dirs",
+            "返回 Terrain 所有 TerrainLayer 的 Diffuse 贴图目录（去重）及各层贴图完整路径。参数: terrain(string,可选)")]
+        public static object GetDiffuseDirs(BridgeContext ctx, BridgeArgs args)
+        {
+            var terrain = SelectTerrain(args);
+            var td = terrain.terrainData;
+            var result = new TerrainDiffuseDirsResult { terrain = terrain.gameObject.name };
+            var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var layers = td.terrainLayers ?? new TerrainLayer[0];
+            for (int i = 0; i < layers.Length; i++)
+            {
+                var layer = layers[i];
+                string texPath = "";
+                string dir = "";
+                if (layer != null && layer.diffuseTexture != null)
+                {
+                    texPath = AssetDatabase.GetAssetPath(layer.diffuseTexture);
+                    if (!string.IsNullOrEmpty(texPath))
+                    {
+                        dir = System.IO.Path.GetDirectoryName(texPath) ?? "";
+                        if (!string.IsNullOrEmpty(dir))
+                            dirs.Add(dir.Replace('\\', '/'));
+                    }
+                }
+                result.layers.Add(new TerrainDiffuseDirInfo
+                {
+                    index = i,
+                    name = layer != null ? layer.name : "(null)",
+                    diffuseTexture = texPath,
+                    diffuseDir = dir.Replace('\\', '/'),
+                });
+            }
+            result.directories = new List<string>(dirs);
+            result.directories.Sort(StringComparer.OrdinalIgnoreCase);
+            result.count = result.layers.Count;
+            result.directoryCount = result.directories.Count;
+            return result;
+        }
+
         [BridgeCommand("terrain.get_alphamaps", "读取纹理混合权重。参数: terrain(string,可选), xBase,zBase,width,height(可选,默认全图)。data index=(y*width+x)*layers+layer")]
         public static object GetAlphamaps(BridgeContext ctx, BridgeArgs args)
         {
@@ -625,7 +684,7 @@ namespace UnityPythonBridge.Commands
                 }
             }
 
-            td.SetTreeInstances(list, true);   // snapToTerrain=true，自动贴地
+            td.SetTreeInstances(list.ToArray(), true);   // snapToHeightmap=true，自动贴地
             EditorUtility.SetDirty(td);
 
             return new TerrainAddTreesResult
@@ -660,7 +719,7 @@ namespace UnityPythonBridge.Commands
             var terrain = SelectTerrain(args);
             var td = terrain.terrainData;
             int removed = td.treeInstances?.Length ?? 0;
-            td.SetTreeInstances(new List<TreeInstance>(), false);
+            td.SetTreeInstances(new TreeInstance[0], false);
             EditorUtility.SetDirty(td);
 
             return new TerrainClearTreesResult

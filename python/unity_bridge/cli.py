@@ -240,6 +240,26 @@ def _cmd_terrain_get_layers(args) -> int:
     return 0
 
 
+def _cmd_terrain_get_diffuse_dirs(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.get_diffuse_dirs(args.terrain)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  layers={data.get('count')}  "
+          f"directories={data.get('directoryCount')}")
+    print("去重贴图目录:")
+    for d in data.get("directories", []):
+        print(f"  {d}")
+    print("各层 Diffuse 贴图:")
+    for l in data.get("layers", []):
+        tex = l.get("diffuseTexture") or "(无贴图)"
+        print(f"  [{l.get('index')}] {l.get('name')}  {tex}")
+        if l.get("diffuseDir"):
+            print(f"      dir: {l.get('diffuseDir')}")
+    return 0
+
+
 def _cmd_terrain_get_alphamaps(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.get_alphamaps(args.terrain, args.xBase, args.zBase, args.width, args.height)
@@ -452,6 +472,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_tlayers.add_argument("--terrain", default=None)
     p_tlayers.add_argument("--json", action="store_true")
     p_tlayers.set_defaults(func=_cmd_terrain_get_layers)
+
+    p_tdiff = sub.add_parser("terrain-get-diffuse-dirs", aliases=["tdiff"],
+                             help="返回 Terrain 所有 TerrainLayer 的 Diffuse 贴图目录（去重）及完整路径")
+    p_tdiff.add_argument("--terrain", default=None)
+    p_tdiff.add_argument("--json", action="store_true")
+    p_tdiff.set_defaults(func=_cmd_terrain_get_diffuse_dirs)
 
     p_tamap = sub.add_parser("terrain-get-alphamaps", aliases=["tamap"],
                              help="读取纹理混合权重")

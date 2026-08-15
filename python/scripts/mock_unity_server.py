@@ -52,6 +52,7 @@ COMMANDS = [
     {"name": "terrain.get_heights", "description": "读取高度图区域。参数: terrain, xBase, zBase, width, height"},
     {"name": "terrain.set_heights", "description": "写入高度图。参数: terrain, xBase, zBase, width, height, data(float[]) 或 noise/noiseScale/noiseSeed/baseHeight/heightScale"},
     {"name": "terrain.get_layers", "description": "列出 Terrain 纹理层。参数: terrain(string,可选)"},
+    {"name": "terrain.get_diffuse_dirs", "description": "返回 Terrain 所有 TerrainLayer 的 Diffuse 贴图目录（去重）及完整路径。参数: terrain(string,可选)"},
     {"name": "terrain.get_alphamaps", "description": "读取纹理混合权重。参数: terrain, xBase, zBase, width, height"},
     {"name": "terrain.set_alphamaps", "description": "写入纹理混合权重。参数: terrain, xBase, zBase, width, height, data(float[])"},
     {"name": "terrain.list_details", "description": "列出 Terrain 草原型。参数: terrain(string,可选)"},
@@ -124,6 +125,8 @@ def handle_client(client: socket.socket) -> None:
                     data = mock_set_heights(args)
                 elif cmd == "terrain.get_layers":
                     data = mock_get_layers()
+                elif cmd == "terrain.get_diffuse_dirs":
+                    data = mock_get_diffuse_dirs()
                 elif cmd == "terrain.get_alphamaps":
                     data = mock_get_alphamaps(args)
                 elif cmd == "terrain.set_alphamaps":
@@ -306,6 +309,30 @@ def mock_set_heights(args: dict) -> dict:
 def mock_get_layers() -> dict:
     t = MOCK_TERRAIN
     return {"terrain": t["name"], "count": len(t["layers"]), "layers": t["layers"]}
+
+
+def mock_get_diffuse_dirs() -> dict:
+    t = MOCK_TERRAIN
+    dirs = []
+    layers_out = []
+    for l in t["layers"]:
+        tex = l.get("diffuseTexture", "")
+        d = os.path.dirname(tex).replace("\\", "/") if tex else ""
+        if d and d not in dirs:
+            dirs.append(d)
+        layers_out.append({
+            "index": l["index"],
+            "name": l["name"],
+            "diffuseTexture": tex,
+            "diffuseDir": d,
+        })
+    return {
+        "terrain": t["name"],
+        "count": len(layers_out),
+        "directoryCount": len(dirs),
+        "directories": dirs,
+        "layers": layers_out,
+    }
 
 
 def mock_get_alphamaps(args: dict) -> dict:
