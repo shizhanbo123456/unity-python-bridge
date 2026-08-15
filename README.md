@@ -43,7 +43,7 @@
 | 通信协议 | TCP + 单行 JSON（UTF-8） | 简单可靠、调试直观（可用 netcat 直接发命令） |
 | JSON 实现 | Unity 内置 `JsonUtility` | 零第三方依赖，拖入 Assets 即用，跨项目零配置 |
 | 监听地址 | `127.0.0.1` 仅本机 | 避免局域网暴露风险 |
-| 线程模型 | 后台线程收发 + **主线程队列执行** | Unity API 只能主线程访问，`EditorApplication.update` 驱动队列，Edit Mode 与 Play Mode 均安全可用 |
+| 线程模型 | 后台线程收发 + **主线程队列执行** | Unity API 只能主线程访问，命令队列由 **BridgeServer 自身驱动**（`EditorApplication.update`），Edit Mode 与 Play Mode 均安全可用，**不依赖场景组件** |
 | 命令注册 | **反射扫描 `[BridgeCommand]` 特性** | 新增命令只需写一个静态方法类，零改动现有代码 |
 | 数据格式 | 请求 `{id, cmd, args}` / 响应 `{id, ok, data\|error}` | 支持并发请求（按 id 匹配），错误与数据分离 |
 | Python 依赖 | 纯标准库 | 零安装成本，Python 3.8+ |
@@ -55,12 +55,12 @@
 ### 1. Unity 侧（一次配置）
 
 1. 把本仓库整个文件夹（`unity-python-bridge/`）复制或 `git clone` 到 Unity 项目的 `Assets/` 下，即 `Assets/unity-python-bridge/`。
-2. 等待编译完成，**新建空物体 → Add Component → 搜索 `Bridge Manager`** 挂上组件。在 Inspector 点击「启动服务器」，看到日志提示监听 `127.0.0.1:21927` 即成功。
+2. 等待编译完成，用菜单 **Tools → Unity Python Bridge → Start Server** 启动服务器，看到日志提示监听 `127.0.0.1:21927` 即成功。
    - Edit Mode 和 Play Mode 均可使用（命令在主线程执行）。
-   - 也可用菜单 **Tools → Unity Python Bridge → Start Server** 快捷启动。
+   - **BridgeManager 组件（可选）**：场景里新建空物体 → Add Component → 搜索 `Bridge Manager` 挂上，Inspector 会显示「启动/停止服务器」按钮，且**组件被销毁时自动停止服务器**。不挂组件也完全可用（菜单等效，服务器自驱命令队列）。
 
-> **重编译自动恢复**：BridgeManager 会把服务器状态持久化到 `Library/BridgeServerState.txt`——**触发脚本重编译或重新打开项目后，自动按该状态恢复**（无需手动重启）。
-> 销毁 BridgeManager 组件/物体时，服务器会自动停止（若正在运行）。菜单 Start/Stop 也会同步写入该状态。
+> **重编译自动恢复**：服务器状态会持久化到 `Library/BridgeServerState.txt`——**触发脚本重编译或重新打开项目后，自动按该状态恢复**（无需手动重启）。
+> 菜单 Start/Stop 与组件按钮均会同步写入该状态。也可用 `python -m unity_bridge reload` 命令行触发重编译并自动等待恢复（见「命令总览」）。
 
 ### 2. Python 侧
 
@@ -106,9 +106,9 @@ python -m unity_bridge tree --components
 
 ---
 
-## 三、命令总览（5 条原生命令 + 12 条 Terrain 命令）
+## 三、命令总览（25 条：7 基础 + 3 调试 + 15 Terrain）
 
-### A. 原生命令（5 条）
+### A. 基础命令（7 条）
 
 | 命令 (bus name) | 类别 | 功能 | Python CLI | 关键参数 |
 |---|---|---|---|---|
@@ -120,7 +120,15 @@ python -m unity_bridge tree --components
 | `bridge.version` | 系统 | 返回桥接层版本号与命令统计，确认 Unity 侧代码是否为最新 | `version`（`ver`/`v`） | 无 |
 | `bridge.reload` | 系统 | 触发 Unity 脚本重编译（domain reload），编译完成后服务器自动恢复 | `reload`（`rl`） | `--expect-version`、`--timeout`、`--interval` |
 
-> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询。当前版本 **v1.2.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具）。
+### A2. 调试命令（3 条）
+
+| 命令 (bus name) | 功能 | Python CLI | 关键参数 |
+|---|---|---|---|
+| `debug.log` | 在 Unity Console 打印一条 Info 日志 | `debug-log`（`dlog`） | `message` |
+| `debug.log_warning` | 在 Unity Console 打印一条 Warning 日志 | `debug-log-warning`（`dlogw`） | `message` |
+| `debug.log_error` | 在 Unity Console 打印一条 Error 日志 | `debug-log-error`（`dloge`） | `message` |
+
+> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询。当前版本 **v1.2.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具；后续 debug 命令、reload、Flush 驱动下沉均保持 v1.2.0）。
 
 **触发重编译并等待恢复**：
 
@@ -135,10 +143,11 @@ python -m unity_bridge reload --expect-version 1.2.0
 python -m unity_bridge reload --timeout 180 --interval 2
 ```
 
-> 原理：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `EditorApplication.RequestScriptReload()` 触发重编译；
+> 原理：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `CompilationPipeline.RequestScriptCompilation()` 触发重编译；
 > 重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。
+> 注意：**Unity 失焦/后台时 `EditorApplication.update` 不运行，重编译不会自动触发**——执行 `reload` 前请让 Unity 窗口保持在前台。
 
-### B. Terrain 程序化编辑命令（12 条，Unity 原生 TerrainData API）
+### B. Terrain 程序化编辑命令（15 条，Unity 原生 TerrainData API）
 
 > **公共参数**：`terrain`(string, 可选) —— 目标 Terrain 的 GameObject 名称，省略时取场景中**第一个** Terrain；区域参数 `xBase`/`zBase`/`width`/`height`(int, 可选) —— 操作区域，省略时默认整图。
 
@@ -148,6 +157,9 @@ python -m unity_bridge reload --timeout 180 --interval 2
 | `terrain.get_heights` | 高度图 | 读取高度图区域，data 行优先 `index=y*width+x`，值 0~1 | `terrain-get-heights`（`tget`） | `terrain`、`xBase`、`zBase`、`width`、`height` |
 | `terrain.set_heights` | 高度图 | 写入高度图：`data`(float[] 行优先 0~1) **或** `noise=true` 用 Perlin 噪声生成（可复现） | `terrain-set-heights`（`tset`） | `terrain`、区域、`data` / `noise`、`noiseScale`、`noiseSeed`、`baseHeight`、`heightScale` |
 | `terrain.get_layers` | 纹理 | 列出 TerrainLayer（名称 + 漫反射贴图路径） | `terrain-get-layers`（`tlayer`） | `terrain` |
+| `terrain.get_diffuse_dirs` | 纹理 | 返回所有 TerrainLayer 的 Diffuse 贴图**目录（去重）**及每层完整路径（layers 数组 1:1 对应原始索引，不去重） | `terrain-get-diffuse-dirs`（`tdiff`） | `terrain` |
+| `terrain.get_tree_prefab_dirs` | 树木 | 返回所有树原型（TreePrototype）的 Prefab **目录（去重）**及完整路径（trees 数组 1:1 对应原始索引） | `terrain-get-tree-prefab-dirs`（`ttpd`） | `terrain` |
+| `terrain.get_detail_asset_dirs` | 植被 | 返回所有草原型（DetailPrototype）的**预制体或贴图**目录（去重）及完整路径，自动区分类型 | `terrain-get-detail-asset-dirs`（`tdad`） | `terrain` |
 | `terrain.get_alphamaps` | 纹理 | 读取纹理混合权重，data `index=(y*width+x)*layers+layer` | `terrain-get-alphamaps`（`tamap`） | `terrain`、区域 |
 | `terrain.set_alphamaps` | 纹理 | 写入纹理混合权重（**每像素自动归一化**到和为 1） | `terrain-set-alphamaps`（`tsamap`） | `terrain`、区域、`data`(float[]) |
 | `terrain.list_details` | 植被 | 列出草原型（DetailPrototype） | `terrain-list-details`（`tdlist`） | `terrain` |
@@ -310,19 +322,27 @@ python -m unity_bridge bounds Assets/Prefabs/Tree.prefab --json   # bounds 为 m
 新增命令 = 新建一个静态方法 + 打上特性，**不需要改任何其他代码**：
 
 ```csharp
-// Editor/Commands/MyCommands.cs
+// Runtime/Commands/MyCommands.cs
 using UnityEngine;
 
 namespace UnityPythonBridge.Commands
 {
+    // 返回值必须是 [Serializable] 类（JsonUtility 序列化要求，不能返回匿名类型）
+    [System.Serializable]
+    public class LogResult
+    {
+        public bool logged;
+        public string message;
+    }
+
     public static class MyCommands
     {
         [BridgeCommand("debug.log", "在 Unity Console 打印一行日志。参数: message(string)")]
         public static object Log(BridgeContext ctx, BridgeArgs args)
         {
-            var message = args.path ?? "";  // 参数从 BridgeArgs 强类型字段读取
+            var message = args.message ?? "";  // 参数从 BridgeArgs 强类型字段读取
             Debug.Log("[Bridge] " + message);
-            return new { logged = true, length = message.Length };
+            return new LogResult { logged = true, message = message };
         }
     }
 }
@@ -332,19 +352,21 @@ namespace UnityPythonBridge.Commands
 > 或 Unity 支持的容器**（List / 数组 / Vector3 等），不能返回匿名类型。若需要新参数，在
 > `BridgeContext.cs` 的 `BridgeArgs` 类中追加字段即可。
 
-保存后重新编译，Python 侧即可使用：
+保存后重新编译，Python 侧即可使用（已有子命令直接调用，或通用方式）：
 
 ```bash
-python -m unity_bridge call debug.log --message "hello"
-```
+# 已有专用子命令（debug 系列）
+python -m unity_bridge debug-log "hello"
+python -m unity_bridge dlogw "warning" 
+python -m unity_bridge dloge "error"
 
-> `call` 通用子命令暂未实现（当前已有 tree / list / mesh-bounds / screenshot 等子命令），
-> 如需可加，或直接用 Python API：
-> ```python
-> from unity_bridge import UnityClient
-> with UnityClient() as c:
->     c.call("debug.log", path="hello")
-> ```
+# 或直接用 Python API 调用任意命令
+python -c "
+from unity_bridge import UnityClient
+with UnityClient() as c:
+    c.call('debug.log', message='hello')
+"
+```
 
 **命令签名约定：**
 
@@ -379,28 +401,30 @@ public static object MethodName(BridgeContext ctx, BridgeArgs args)
 
 ```
 unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
-├── Editor/                         ← 全部代码在 Editor 程序集（纯编辑器工具，不进 Player）
-│   ├── BridgeManager.cs            # 挂场景组件：驱动命令队列、销毁时自动停服
+├── Editor/                         ← 纯编辑器工具（Editor 程序集，不进 Player）
 │   ├── BridgeManagerInspector.cs   # BridgeManager 的 Inspector 按钮 + Tools 菜单快捷入口
-│   ├── BridgeAutoRestart.cs        # 服务器状态持久化 + 重编译后自动恢复
-│   ├── BridgeStateStore.cs         # 状态文件读写（Library/BridgeServerState.txt）
+│   └── BridgeAutoRestart.cs        # 服务器状态持久化 + 重编译后自动恢复（时机管理）
+├── Runtime/                        ← 桥接层 + 可挂场景组件（Assembly-CSharp，全部 #if UNITY_EDITOR 包裹）
+│   ├── BridgeManager.cs            # 可选场景组件：Inspector 按钮宿主、销毁时自动停服
 │   ├── BridgeCommandAttribute.cs   # [BridgeCommand] 命令特性
 │   ├── BridgeContext.cs            # 执行上下文 + BridgeArgs 强类型参数 + 委托定义
 │   ├── BridgeDispatcher.cs         # 反射扫描 + 命令分发
 │   ├── BridgeInfo.cs               # 版本号与命令统计（菜单"打印版本信息" / bridge.version）
-│   ├── BridgeServer.cs             # TCP 服务器（单行 JSON 协议，JsonUtility）
+│   ├── BridgeServer.cs             # TCP 服务器（单行 JSON，JsonUtility；自带 Flush 驱动，不依赖组件）
+│   ├── BridgeStateStore.cs         # 状态文件读写（Library/BridgeServerState.txt）
 │   ├── MainThreadRunner.cs         # 主线程执行队列
 │   └── Commands/
 │       ├── SceneTreeCommand.cs     # 命令 scene.tree
 │       ├── MeshBoundsCommand.cs    # 命令 mesh.bounds（包围盒计算）
 │       ├── PrefabScreenshotCommand.cs  # 命令 prefab.screenshot（隔离复制+相机截图）
 │       ├── TerrainCommands.cs      # 命令 terrain.*（高度图/纹理/植被/树木，Unity 原生 TerrainData）
-│       └── SystemCommands.cs       # bridge.ping / bridge.list_commands
+│       ├── SystemCommands.cs       # bridge.ping / bridge.list_commands / bridge.version / bridge.reload
+│       └── DebugCommands.cs        # debug.log / debug.log_warning / debug.log_error
 └── python/                         # Python 侧（无需安装依赖）
     ├── unity_bridge/
     │   ├── __init__.py
     │   ├── client.py               # TCP/JSON 客户端 UnityClient
-    │   ├── cli.py                  # 命令行入口（tree / list / mesh-bounds / screenshot / reload）
+    │   ├── cli.py                  # 命令行入口（tree / list / mesh-bounds / screenshot / terrain / reload / debug）
     │   └── __main__.py             # 支持 python -m unity_bridge
     ├── scripts/
     │   └── mock_unity_server.py    # 模拟 Unity 侧协议，无 Unity 也能联调
@@ -413,7 +437,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 
 - 服务器**只绑定 127.0.0.1**，仅本机进程可访问，不会暴露到局域网。
 - 命令在主线程执行，避免 Unity API 跨线程调用崩溃。
-- 关闭 Bridge 窗口会自动停止服务器，不留后台线程。
+- 销毁场景中的 BridgeManager 组件/物体（若挂了）会自动停止服务器，不留后台线程。
 - 若要在打包后的 Player 中使用，请自行评估：本项目针对 **Editor 开发期工具** 场景。
 - **首次导入后**：Unity 会为脚本生成 `.meta` 文件（GUID）。若希望跨项目复制时保持 GUID
   稳定（推荐），请把生成的 `.meta` 一并提交到 git。
