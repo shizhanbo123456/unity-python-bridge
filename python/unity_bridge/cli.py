@@ -260,6 +260,47 @@ def _cmd_terrain_get_diffuse_dirs(args) -> int:
     return 0
 
 
+def _cmd_terrain_get_tree_prefab_dirs(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.get_tree_prefab_dirs(args.terrain)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  trees={data.get('count')}  "
+          f"directories={data.get('directoryCount')}")
+    print("去重预制体目录:")
+    for d in data.get("directories", []):
+        print(f"  {d}")
+    print("各树原型 Prefab:")
+    for t in data.get("trees", []):
+        prefab = t.get("prefab") or "(无预制体)"
+        print(f"  [{t.get('index')}] {t.get('name')}  {prefab}")
+        if t.get("prefabDir"):
+            print(f"      dir: {t.get('prefabDir')}")
+    return 0
+
+
+def _cmd_terrain_get_detail_asset_dirs(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.get_detail_asset_dirs(args.terrain)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  details={data.get('count')}  "
+          f"directories={data.get('directoryCount')}")
+    print("去重资源目录:")
+    for d in data.get("directories", []):
+        print(f"  {d}")
+    print("各草原型资源:")
+    for d in data.get("details", []):
+        kind = {"prefab": "预制体", "texture": "贴图", "none": "无"}.get(d.get("type"), d.get("type"))
+        asset = d.get("asset") or "(无)"
+        print(f"  [{d.get('index')}] {d.get('name')}  [{kind}]  {asset}")
+        if d.get("assetDir"):
+            print(f"      dir: {d.get('assetDir')}")
+    return 0
+
+
 def _cmd_terrain_get_alphamaps(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.get_alphamaps(args.terrain, args.xBase, args.zBase, args.width, args.height)
@@ -478,6 +519,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_tdiff.add_argument("--terrain", default=None)
     p_tdiff.add_argument("--json", action="store_true")
     p_tdiff.set_defaults(func=_cmd_terrain_get_diffuse_dirs)
+
+    p_ttpd = sub.add_parser("terrain-get-tree-prefab-dirs", aliases=["ttpd"],
+                            help="返回 Terrain 所有树原型的 Prefab 目录（去重）及完整路径")
+    p_ttpd.add_argument("--terrain", default=None)
+    p_ttpd.add_argument("--json", action="store_true")
+    p_ttpd.set_defaults(func=_cmd_terrain_get_tree_prefab_dirs)
+
+    p_tdad = sub.add_parser("terrain-get-detail-asset-dirs", aliases=["tdad"],
+                            help="返回 Terrain 所有草原型的预制体或贴图目录（去重）及完整路径")
+    p_tdad.add_argument("--terrain", default=None)
+    p_tdad.add_argument("--json", action="store_true")
+    p_tdad.set_defaults(func=_cmd_terrain_get_detail_asset_dirs)
 
     p_tamap = sub.add_parser("terrain-get-alphamaps", aliases=["tamap"],
                              help="读取纹理混合权重")

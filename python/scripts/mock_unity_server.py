@@ -53,6 +53,8 @@ COMMANDS = [
     {"name": "terrain.set_heights", "description": "写入高度图。参数: terrain, xBase, zBase, width, height, data(float[]) 或 noise/noiseScale/noiseSeed/baseHeight/heightScale"},
     {"name": "terrain.get_layers", "description": "列出 Terrain 纹理层。参数: terrain(string,可选)"},
     {"name": "terrain.get_diffuse_dirs", "description": "返回 Terrain 所有 TerrainLayer 的 Diffuse 贴图目录（去重）及完整路径。参数: terrain(string,可选)"},
+    {"name": "terrain.get_tree_prefab_dirs", "description": "返回 Terrain 所有树原型的 Prefab 目录（去重）及完整路径。参数: terrain(string,可选)"},
+    {"name": "terrain.get_detail_asset_dirs", "description": "返回 Terrain 所有草原型的预制体或贴图目录（去重）及完整路径。参数: terrain(string,可选)"},
     {"name": "terrain.get_alphamaps", "description": "读取纹理混合权重。参数: terrain, xBase, zBase, width, height"},
     {"name": "terrain.set_alphamaps", "description": "写入纹理混合权重。参数: terrain, xBase, zBase, width, height, data(float[])"},
     {"name": "terrain.list_details", "description": "列出 Terrain 草原型。参数: terrain(string,可选)"},
@@ -76,8 +78,14 @@ MOCK_TERRAIN = {
         {"index": 0, "name": "Grass", "diffuseTexture": "Assets/Textures/grass.jpg"},
         {"index": 1, "name": "Rock", "diffuseTexture": "Assets/Textures/rock.jpg"},
     ],
-    "details": [{"index": 0, "name": "TallGrass"}],
-    "trees": [{"index": 0, "name": "OakTree"}],
+    "details": [
+        {"index": 0, "name": "TallGrass", "type": "prefab", "asset": "Assets/Vegetation/TallGrass.prefab"},
+        {"index": 1, "name": "FlowerPatch", "type": "texture", "asset": "Assets/Textures/flower.png"},
+    ],
+    "trees": [
+        {"index": 0, "name": "OakTree", "prefab": "Assets/Vegetation/Trees/OakTree.prefab"},
+        {"index": 1, "name": "PineTree", "prefab": "Assets/Vegetation/Trees/PineTree.prefab"},
+    ],
     "heightmap": {},   # {(x,z): height} 模拟高度图局部修改
     "alphamap": {},    # {(x,z,layer): weight}
     "detail": {},      # {(x,z): density}
@@ -127,6 +135,10 @@ def handle_client(client: socket.socket) -> None:
                     data = mock_get_layers()
                 elif cmd == "terrain.get_diffuse_dirs":
                     data = mock_get_diffuse_dirs()
+                elif cmd == "terrain.get_tree_prefab_dirs":
+                    data = mock_get_tree_prefab_dirs()
+                elif cmd == "terrain.get_detail_asset_dirs":
+                    data = mock_get_detail_asset_dirs()
                 elif cmd == "terrain.get_alphamaps":
                     data = mock_get_alphamaps(args)
                 elif cmd == "terrain.set_alphamaps":
@@ -332,6 +344,56 @@ def mock_get_diffuse_dirs() -> dict:
         "directoryCount": len(dirs),
         "directories": dirs,
         "layers": layers_out,
+    }
+
+
+def mock_get_tree_prefab_dirs() -> dict:
+    t = MOCK_TERRAIN
+    dirs = []
+    trees_out = []
+    for tr in t["trees"]:
+        prefab = tr.get("prefab", "")
+        d = os.path.dirname(prefab).replace("\\", "/") if prefab else ""
+        if d and d not in dirs:
+            dirs.append(d)
+        trees_out.append({
+            "index": tr["index"],
+            "name": tr["name"],
+            "prefab": prefab,
+            "prefabDir": d,
+        })
+    return {
+        "terrain": t["name"],
+        "count": len(trees_out),
+        "directoryCount": len(dirs),
+        "directories": dirs,
+        "trees": trees_out,
+    }
+
+
+def mock_get_detail_asset_dirs() -> dict:
+    t = MOCK_TERRAIN
+    dirs = []
+    details_out = []
+    for d in t["details"]:
+        asset = d.get("asset", "")
+        typ = d.get("type", "none")
+        adir = os.path.dirname(asset).replace("\\", "/") if asset else ""
+        if adir and adir not in dirs:
+            dirs.append(adir)
+        details_out.append({
+            "index": d["index"],
+            "name": d["name"],
+            "type": typ,
+            "asset": asset,
+            "assetDir": adir,
+        })
+    return {
+        "terrain": t["name"],
+        "count": len(details_out),
+        "directoryCount": len(dirs),
+        "directories": dirs,
+        "details": details_out,
     }
 
 

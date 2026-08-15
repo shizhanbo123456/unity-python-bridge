@@ -165,6 +165,45 @@ namespace UnityPythonBridge.Commands
     }
 
     [Serializable]
+    public class TerrainTreePrefabInfo
+    {
+        public int index;
+        public string name;
+        public string prefab;   // 预制体完整路径（AssetDatabase 路径）
+        public string prefabDir; // 预制体所在目录
+    }
+
+    [Serializable]
+    public class TerrainTreePrefabDirsResult
+    {
+        public string terrain;
+        public int count;               // TreePrototype 数量
+        public int directoryCount;      // 去重后的目录数量
+        public List<string> directories = new List<string>();
+        public List<TerrainTreePrefabInfo> trees = new List<TerrainTreePrefabInfo>();
+    }
+
+    [Serializable]
+    public class TerrainDetailAssetInfo
+    {
+        public int index;
+        public string name;
+        public string type;     // "prefab" / "texture" / "none"
+        public string asset;    // 预制体或贴图的完整路径
+        public string assetDir; // 所在目录
+    }
+
+    [Serializable]
+    public class TerrainDetailAssetDirsResult
+    {
+        public string terrain;
+        public int count;               // DetailPrototype 数量
+        public int directoryCount;      // 去重后的目录数量
+        public List<string> directories = new List<string>();
+        public List<TerrainDetailAssetInfo> details = new List<TerrainDetailAssetInfo>();
+    }
+
+    [Serializable]
     public class TerrainTreeInstanceInfo
     {
         public int index;
@@ -425,6 +464,103 @@ namespace UnityPythonBridge.Commands
             result.directories = new List<string>(dirs);
             result.directories.Sort(StringComparer.OrdinalIgnoreCase);
             result.count = result.layers.Count;
+            result.directoryCount = result.directories.Count;
+            return result;
+        }
+
+        [BridgeCommand("terrain.get_tree_prefab_dirs",
+            "返回 Terrain 所有树原型（TreePrototype）的 Prefab 目录（去重）及各预制体完整路径。参数: terrain(string,可选)")]
+        public static object GetTreePrefabDirs(BridgeContext ctx, BridgeArgs args)
+        {
+            var terrain = SelectTerrain(args);
+            var td = terrain.terrainData;
+            var result = new TerrainTreePrefabDirsResult { terrain = terrain.gameObject.name };
+            var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var prototypes = td.treePrototypes ?? new TreePrototype[0];
+            for (int i = 0; i < prototypes.Length; i++)
+            {
+                var p = prototypes[i];
+                string prefabPath = "";
+                string dir = "";
+                if (p != null && p.prefab != null)
+                {
+                    prefabPath = AssetDatabase.GetAssetPath(p.prefab);
+                    if (!string.IsNullOrEmpty(prefabPath))
+                    {
+                        dir = System.IO.Path.GetDirectoryName(prefabPath) ?? "";
+                        if (!string.IsNullOrEmpty(dir))
+                            dirs.Add(dir.Replace('\\', '/'));
+                    }
+                }
+                result.trees.Add(new TerrainTreePrefabInfo
+                {
+                    index = i,
+                    name = p != null && p.prefab != null ? p.prefab.name : "(null)",
+                    prefab = prefabPath,
+                    prefabDir = dir.Replace('\\', '/'),
+                });
+            }
+            result.directories = new List<string>(dirs);
+            result.directories.Sort(StringComparer.OrdinalIgnoreCase);
+            result.count = result.trees.Count;
+            result.directoryCount = result.directories.Count;
+            return result;
+        }
+
+        [BridgeCommand("terrain.get_detail_asset_dirs",
+            "返回 Terrain 所有草原型（DetailPrototype）的预制体或贴图目录（去重）及各自完整路径。参数: terrain(string,可选)")]
+        public static object GetDetailAssetDirs(BridgeContext ctx, BridgeArgs args)
+        {
+            var terrain = SelectTerrain(args);
+            var td = terrain.terrainData;
+            var result = new TerrainDetailAssetDirsResult { terrain = terrain.gameObject.name };
+            var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var prototypes = td.detailPrototypes ?? new DetailPrototype[0];
+            for (int i = 0; i < prototypes.Length; i++)
+            {
+                var p = prototypes[i];
+                string type = "none";
+                string assetPath = "";
+                string name = "(null)";
+                string dir = "";
+
+                if (p != null)
+                {
+                    if (p.prototype != null)
+                    {
+                        type = "prefab";
+                        name = p.prototype.name;
+                        assetPath = AssetDatabase.GetAssetPath(p.prototype);
+                    }
+                    else if (p.prototypeTexture != null)
+                    {
+                        type = "texture";
+                        name = p.prototypeTexture.name;
+                        assetPath = AssetDatabase.GetAssetPath(p.prototypeTexture);
+                    }
+
+                    if (!string.IsNullOrEmpty(assetPath))
+                    {
+                        dir = System.IO.Path.GetDirectoryName(assetPath) ?? "";
+                        if (!string.IsNullOrEmpty(dir))
+                            dirs.Add(dir.Replace('\\', '/'));
+                    }
+                }
+
+                result.details.Add(new TerrainDetailAssetInfo
+                {
+                    index = i,
+                    name = name,
+                    type = type,
+                    asset = assetPath,
+                    assetDir = dir.Replace('\\', '/'),
+                });
+            }
+            result.directories = new List<string>(dirs);
+            result.directories.Sort(StringComparer.OrdinalIgnoreCase);
+            result.count = result.details.Count;
             result.directoryCount = result.directories.Count;
             return result;
         }

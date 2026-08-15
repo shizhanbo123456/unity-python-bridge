@@ -219,6 +219,14 @@ class UnityClient:
         """清空 Terrain 上所有树实例。"""
         return self.call("terrain.clear_trees", terrain=terrain)
 
+    def get_tree_prefab_dirs(self, terrain: str = None) -> dict:
+        """返回 Terrain 所有树原型的 Prefab 目录（去重）及各预制体完整路径。"""
+        return self.call("terrain.get_tree_prefab_dirs", terrain=terrain)
+
+    def get_detail_asset_dirs(self, terrain: str = None) -> dict:
+        """返回 Terrain 所有草原型的预制体或贴图目录（去重）及各自完整路径。"""
+        return self.call("terrain.get_detail_asset_dirs", terrain=terrain)
+
     # ---- 内部 ----
 
     def _ensure_connected(self) -> None:
