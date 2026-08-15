@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System.Linq;
 using UnityEngine;
 
@@ -52,4 +51,3 @@ namespace UnityPythonBridge
         public int terrainCommandCount;
     }
 }
-#endif // UNITY_EDITOR

@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System;
 using UnityEditor;
 using UnityEngine;
@@ -130,4 +129,3 @@ namespace UnityPythonBridge.Commands
         }
     }
 }
-#endif // UNITY_EDITOR

@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using System;
 
 namespace UnityPythonBridge
@@ -22,4 +21,3 @@ namespace UnityPythonBridge
         }
     }
 }
-#endif // UNITY_EDITOR

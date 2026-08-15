@@ -1,8 +1,8 @@
-#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Compilation;
 
 namespace UnityPythonBridge.Commands
 {
@@ -79,9 +79,9 @@ namespace UnityPythonBridge.Commands
         public static object Reload(BridgeContext ctx, BridgeArgs args)
         {
             // 确保重编译后自动恢复：先写状态"运行中"
-            BridgeAutoRestart.SaveState(true);
+            BridgeStateStore.Save(true);
             // 延迟一帧触发重编译，保证本次响应先发回客户端（否则响应会随旧域一起丢失）
-            EditorApplication.delayCall += () => EditorApplication.RequestScriptReload();
+            EditorApplication.delayCall += CompilationPipeline.RequestScriptCompilation;
 
             return new ReloadResult
             {
@@ -91,4 +91,3 @@ namespace UnityPythonBridge.Commands
         }
     }
 }
-#endif // UNITY_EDITOR

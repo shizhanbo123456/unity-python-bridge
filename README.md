@@ -310,7 +310,7 @@ python -m unity_bridge bounds Assets/Prefabs/Tree.prefab --json   # bounds 为 m
 新增命令 = 新建一个静态方法 + 打上特性，**不需要改任何其他代码**：
 
 ```csharp
-// Runtime/Commands/MyCommands.cs
+// Editor/Commands/MyCommands.cs
 using UnityEngine;
 
 namespace UnityPythonBridge.Commands
@@ -379,11 +379,11 @@ public static object MethodName(BridgeContext ctx, BridgeArgs args)
 
 ```
 unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
-├── Editor/
-│   ├── BridgeManagerInspector.cs   # BridgeManager 的 Inspector 按钮 + Tools 菜单快捷入口
-│   └── BridgeAutoRestart.cs        # 服务器状态持久化 + 重编译后自动恢复
-├── Runtime/
+├── Editor/                         ← 全部代码在 Editor 程序集（纯编辑器工具，不进 Player）
 │   ├── BridgeManager.cs            # 挂场景组件：驱动命令队列、销毁时自动停服
+│   ├── BridgeManagerInspector.cs   # BridgeManager 的 Inspector 按钮 + Tools 菜单快捷入口
+│   ├── BridgeAutoRestart.cs        # 服务器状态持久化 + 重编译后自动恢复
+│   ├── BridgeStateStore.cs         # 状态文件读写（Library/BridgeServerState.txt）
 │   ├── BridgeCommandAttribute.cs   # [BridgeCommand] 命令特性
 │   ├── BridgeContext.cs            # 执行上下文 + BridgeArgs 强类型参数 + 委托定义
 │   ├── BridgeDispatcher.cs         # 反射扫描 + 命令分发
@@ -400,7 +400,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
     ├── unity_bridge/
     │   ├── __init__.py
     │   ├── client.py               # TCP/JSON 客户端 UnityClient
-    │   ├── cli.py                  # 命令行入口（tree / list / mesh-bounds / screenshot）
+    │   ├── cli.py                  # 命令行入口（tree / list / mesh-bounds / screenshot / reload）
     │   └── __main__.py             # 支持 python -m unity_bridge
     ├── scripts/
     │   └── mock_unity_server.py    # 模拟 Unity 侧协议，无 Unity 也能联调

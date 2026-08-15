@@ -1,4 +1,3 @@
-#if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
 
@@ -79,4 +78,3 @@ namespace UnityPythonBridge
         public static void PrintVersionFromMenu() => BridgeInfo.PrintVersion();
     }
 }
-#endif // UNITY_EDITOR
