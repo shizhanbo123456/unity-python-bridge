@@ -45,6 +45,7 @@ COMMANDS = [
     {"name": "bridge.ping", "description": "连通性测试，成功返回 pong 与服务器时间"},
     {"name": "bridge.list_commands", "description": "列出所有已通过反射注册的命令"},
     {"name": "bridge.version", "description": "返回桥接层版本号与命令统计，用于确认 Unity 侧代码是否为最新"},
+    {"name": "bridge.echo", "description": "回显传入的 message 参数与服务器时间。参数: message(string)"},
     {"name": "bridge.reload", "description": "触发 Unity 脚本重编译（domain reload），编译完成后服务器自动恢复"},
     {"name": "debug.log", "description": "在 Unity Console 打印一条 Info 日志。参数: message(string)"},
     {"name": "debug.log_warning", "description": "在 Unity Console 打印一条 Warning 日志。参数: message(string)"},
@@ -121,6 +122,9 @@ def handle_client(client: socket.socket) -> None:
                 elif cmd == "bridge.reload":
                     data = {"requested": True,
                             "message": "[mock] 重编译已触发（模拟立即恢复）"}
+                elif cmd == "bridge.echo":
+                    data = {"message": args.get("message", ""),
+                            "time": "2026-08-15T10:00:00Z"}
                 elif cmd in ("debug.log", "debug.log_warning", "debug.log_error"):
                     level = {"debug.log": "info",
                              "debug.log_warning": "warning",

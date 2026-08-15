@@ -23,6 +23,14 @@ namespace UnityPythonBridge.Commands
         public string message;
     }
 
+    /// <summary>bridge.echo 返回结构。</summary>
+    [System.Serializable]
+    public class EchoResult
+    {
+        public string message;
+        public string time;
+    }
+
     /// <summary>bridge.list_commands 返回的单个命令信息。</summary>
     [System.Serializable]
     public class CommandInfo
@@ -72,6 +80,16 @@ namespace UnityPythonBridge.Commands
         public static object Version(BridgeContext ctx, BridgeArgs args)
         {
             return BridgeInfo.GetVersionInfo();
+        }
+
+        [BridgeCommand("bridge.echo", "回显传入的 message 参数与服务器时间（用于验证新命令是否已生效）。参数: message(string)")]
+        public static object Echo(BridgeContext ctx, BridgeArgs args)
+        {
+            return new EchoResult
+            {
+                message = args.message ?? "",
+                time = DateTime.UtcNow.ToString("o")
+            };
         }
 
         [BridgeCommand("bridge.reload",

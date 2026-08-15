@@ -158,6 +158,17 @@ def _cmd_debug_log_error(args) -> int:
     return 0
 
 
+def _cmd_echo(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.echo(args.message)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"echo   : {data.get('message')}")
+    print(f"time   : {data.get('time')}")
+    return 0
+
+
 def _cmd_mesh_bounds(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.mesh_bounds(args.path)
@@ -538,6 +549,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_dbge.add_argument("message", help="日志内容")
     p_dbge.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_dbge.set_defaults(func=_cmd_debug_log_error)
+
+    p_echo = sub.add_parser("echo",
+                            help="回显 message 与服务器时间（验证新命令是否已生效）")
+    p_echo.add_argument("message", help="要回显的内容")
+    p_echo.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_echo.set_defaults(func=_cmd_echo)
 
     p_bounds = sub.add_parser(
         "mesh-bounds", aliases=["bounds"],

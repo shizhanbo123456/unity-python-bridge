@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using UnityEditor;
 using UnityEngine;
 
 namespace UnityPythonBridge
@@ -40,6 +41,11 @@ namespace UnityPythonBridge
                 Name = "UnityPythonBridge-TCP"
             };
             _listenThread.Start();
+
+            // 服务器自身驱动命令执行队列（不再依赖场景中的 BridgeManager 组件，
+            // 避免组件 Missing 时出现"端口监听但命令不执行"）
+            EditorApplication.update += OnEditorUpdate;
+
             Debug.Log($"[UnityPythonBridge] 服务器已启动，监听 127.0.0.1:{Port}（仅本机可访问）");
         }
 
@@ -47,9 +53,16 @@ namespace UnityPythonBridge
         {
             if (!_running) return;
             _running = false;
+            EditorApplication.update -= OnEditorUpdate;
             try { _listener?.Stop(); } catch (Exception) { /* 忽略 */ }
             _listener = null;
             Debug.Log("[UnityPythonBridge] 服务器已停止");
+        }
+
+        /// <summary>主线程驱动：每帧刷新命令执行队列（命令由后台线程投递，此处消费）。</summary>
+        private static void OnEditorUpdate()
+        {
+            MainThreadRunner.Flush();
         }
 
         private static void ListenLoop()
