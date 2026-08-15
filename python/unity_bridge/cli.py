@@ -8,7 +8,7 @@
     python -m unity_bridge mesh-bounds Assets/.../Rock.fbx   # 计算网格/模型/预制体包围盒
     python -m unity_bridge screenshot Assets/Prefabs/Tree.prefab out/tree.png \
         --offset "3,2,5" [--orthographic] [--fov 50] [--width 1920] [--height 1080] \
-        [--bg "0.2,0.2,0.2,1"] [--light 1.5]
+        [--bg "0.2,0.2,0.2,1"] [--light 2]
 """
 
 from __future__ import annotations
@@ -470,7 +470,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_shot.add_argument("--bg", default=None,
                         help="背景色 'r,g,b[,a]'（0~1，默认透明）")
     p_shot.add_argument("--light", type=float, default=0.0,
-                        help="补光强度（默认 0 不补光；>0 时追加与相机同向平行光）")
+                        help="补光强度（默认 0 不补光；>0 时追加与相机同向平行光，推荐 2）")
     p_shot.add_argument("--json", action="store_true", help="输出原始 JSON 而非文本")
     p_shot.set_defaults(func=_cmd_screenshot)
 
