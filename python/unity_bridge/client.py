@@ -52,8 +52,8 @@ class UnityClient:
         except ConnectionRefusedError:
             raise UnityBridgeError(
                 f"无法连接 Unity（{self.host}:{self.port}）。"
-                f"请确认已在 Unity Editor 中通过 Tools > Unity Python Bridge 启动服务器，"
-                f"且端口一致。"
+                f"请确认已在 Unity Editor 中通过 BridgeManager 组件或菜单 "
+                f"Tools > Unity Python Bridge > Start Server 启动服务器，且端口一致。"
             ) from None
         except socket.timeout:
             raise UnityBridgeError(f"连接超时（{self.host}:{self.port}）") from None

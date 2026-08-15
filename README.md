@@ -55,12 +55,12 @@
 ### 1. Unity 侧（一次配置）
 
 1. 把本仓库整个文件夹（`unity-python-bridge/`）复制或 `git clone` 到 Unity 项目的 `Assets/` 下，即 `Assets/unity-python-bridge/`。
-2. 等待编译完成，打开菜单 **Tools → Unity Python Bridge**（或菜单 **Tools → Unity Python Bridge → Start Server**），点击「启动服务器」，看到日志提示监听 `127.0.0.1:21927` 即成功。
+2. 等待编译完成，**新建空物体 → Add Component → 搜索 `Bridge Manager`** 挂上组件。在 Inspector 点击「启动服务器」，看到日志提示监听 `127.0.0.1:21927` 即成功。
    - Edit Mode 和 Play Mode 均可使用（命令在主线程执行）。
+   - 也可用菜单 **Tools → Unity Python Bridge → Start Server** 快捷启动。
 
-> **重编译自动恢复（可选）**：把 `Runtime/BridgeManager.cs` 组件挂到场景任意物体上，Inspector 会显示「启动/停止服务器」按钮；
-> 服务器状态会持久化到 `Library/BridgeServerState.txt`——**触发脚本重编译或重新打开项目后，自动按该状态恢复**（无需手动重启）。
-> 菜单 Start/Stop 也会同步写入该状态。若不需要自动恢复，忽略此组件即可。
+> **重编译自动恢复**：BridgeManager 会把服务器状态持久化到 `Library/BridgeServerState.txt`——**触发脚本重编译或重新打开项目后，自动按该状态恢复**（无需手动重启）。
+> 销毁 BridgeManager 组件/物体时，服务器会自动停止（若正在运行）。菜单 Start/Stop 也会同步写入该状态。
 
 ### 2. Python 侧
 
@@ -363,8 +363,10 @@ public static object MethodName(BridgeContext ctx, BridgeArgs args)
 ```
 unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 ├── Editor/
-│   └── BridgeWindow.cs             # 控制窗口（启动/停止服务器、日志）
+│   ├── BridgeManagerInspector.cs   # BridgeManager 的 Inspector 按钮 + Tools 菜单快捷入口
+│   └── BridgeAutoRestart.cs        # 服务器状态持久化 + 重编译后自动恢复
 ├── Runtime/
+│   ├── BridgeManager.cs            # 挂场景组件：驱动命令队列、销毁时自动停服
 │   ├── BridgeCommandAttribute.cs   # [BridgeCommand] 命令特性
 │   ├── BridgeContext.cs            # 执行上下文 + BridgeArgs 强类型参数 + 委托定义
 │   ├── BridgeDispatcher.cs         # 反射扫描 + 命令分发
