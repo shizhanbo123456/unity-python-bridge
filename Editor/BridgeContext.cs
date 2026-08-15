@@ -23,6 +23,9 @@ namespace UnityPythonBridge
         // ---- scene.tree ----
         public bool components;
 
+        // ---- debug.log / debug.log_warning / debug.log_error ----
+        public string message;
+
         // ---- mesh.bounds / prefab.screenshot ----
         public string path;
         public string output;

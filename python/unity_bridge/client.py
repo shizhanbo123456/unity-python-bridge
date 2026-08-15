@@ -99,6 +99,18 @@ class UnityClient:
         重编译完成后由 BridgeAutoRestart 自动恢复；调用方应轮询等待恢复。"""
         return self.call("bridge.reload")
 
+    def debug_log(self, message: str) -> dict:
+        """在 Unity Console 打印一条 Info 日志。"""
+        return self.call("debug.log", message=message)
+
+    def debug_log_warning(self, message: str) -> dict:
+        """在 Unity Console 打印一条 Warning 日志。"""
+        return self.call("debug.log_warning", message=message)
+
+    def debug_log_error(self, message: str) -> dict:
+        """在 Unity Console 打印一条 Error 日志。"""
+        return self.call("debug.log_error", message=message)
+
     def scene_tree(self, components: bool = False) -> dict:
         return self.call("scene.tree", components=components)
 

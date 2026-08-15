@@ -128,6 +128,36 @@ def _cmd_reload(args) -> int:
     return 1
 
 
+def _cmd_debug_log(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.debug_log(args.message)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"logged: {data.get('logged')}  level={data.get('level')}  message={data.get('message')}")
+    return 0
+
+
+def _cmd_debug_log_warning(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.debug_log_warning(args.message)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"logged: {data.get('logged')}  level={data.get('level')}  message={data.get('message')}")
+    return 0
+
+
+def _cmd_debug_log_error(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.debug_log_error(args.message)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"logged: {data.get('logged')}  level={data.get('level')}  message={data.get('message')}")
+    return 0
+
+
 def _cmd_mesh_bounds(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.mesh_bounds(args.path)
@@ -490,6 +520,24 @@ def build_parser() -> argparse.ArgumentParser:
     p_reload.add_argument("--interval", type=float, default=1.0,
                           help="轮询间隔秒数（默认 1）")
     p_reload.set_defaults(func=_cmd_reload)
+
+    p_dbg = sub.add_parser("debug-log", aliases=["dlog"],
+                           help="在 Unity Console 打印一条 Info 日志")
+    p_dbg.add_argument("message", help="日志内容")
+    p_dbg.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_dbg.set_defaults(func=_cmd_debug_log)
+
+    p_dbgw = sub.add_parser("debug-log-warning", aliases=["dlogw"],
+                            help="在 Unity Console 打印一条 Warning 日志")
+    p_dbgw.add_argument("message", help="日志内容")
+    p_dbgw.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_dbgw.set_defaults(func=_cmd_debug_log_warning)
+
+    p_dbge = sub.add_parser("debug-log-error", aliases=["dloge"],
+                            help="在 Unity Console 打印一条 Error 日志")
+    p_dbge.add_argument("message", help="日志内容")
+    p_dbge.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_dbge.set_defaults(func=_cmd_debug_log_error)
 
     p_bounds = sub.add_parser(
         "mesh-bounds", aliases=["bounds"],
