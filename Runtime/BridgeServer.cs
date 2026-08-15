@@ -136,7 +136,18 @@ namespace UnityPythonBridge
                             try
                             {
                                 var data = BridgeDispatcher.Execute(req.cmd, args);
-                                var dataJson = data != null ? JsonUtility.ToJson(data) : "null";
+                                // 命令返回 string 时视为【已是 JSON 文本】（如 scene.tree 手动构建，
+                                // 绕开 JsonUtility 10 层序列化深度限制），原样嵌入 data 字段；
+                                // 其余类型走 JsonUtility 序列化。
+                                string dataJson;
+                                if (data is string rawJson)
+                                {
+                                    dataJson = rawJson;
+                                }
+                                else
+                                {
+                                    dataJson = data != null ? JsonUtility.ToJson(data) : "null";
+                                }
                                 writer.WriteLine($"{{\"id\":{id},\"ok\":true,\"data\":{dataJson}}}");
                             }
                             catch (Exception e)

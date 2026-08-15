@@ -1,38 +1,23 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace UnityPythonBridge.Commands
 {
-    /// <summary>场景树节点（强类型，JsonUtility 序列化）。</summary>
-    [System.Serializable]
-    public class SceneTreeNode
-    {
-        public string name;
-        public bool active;
-        public List<string> components;
-        public List<SceneTreeNode> children = new List<SceneTreeNode>();
-    }
-
-    /// <summary>scene.tree 返回结构。</summary>
-    [System.Serializable]
-    public class SceneTreeResult
-    {
-        public string type;
-        public string name;
-        public string path;
-        public int buildIndex;
-        public int rootCount;
-        public List<SceneTreeNode> roots = new List<SceneTreeNode>();
-    }
-
     /// <summary>
     /// 场景树命令：以树状结构返回当前激活场景中的物体层级。
+    ///
+    /// 注意：本命令【手动构建 JSON 字符串】返回（而非返回强类型 DTO 交给 JsonUtility 序列化），
+    /// 因为 JsonUtility 存在 10 层序列化深度限制——场景层级超过约 4~5 层就会抛
+    /// "Serialization depth limit 10 exceeded"，而真实项目场景（UI 结构、prefab 嵌套）极易触发。
+    /// 手动拼接 JSON 无深度限制，输出结构不变（仍是 roots 递归树）。
+    ///
     /// 参数:
     ///   components (bool, 可选) - 为 true 时每个节点附带组件类型列表
-    /// 返回结构:
-    ///   { type, name, path, buildIndex, rootCount, roots: [ { name, active, children: [...] } ] }
+    /// 返回（JSON 文本）:
+    ///   { type, name, path, buildIndex, rootCount, roots: [ { name, active, components?, children: [...] } ] }
     /// </summary>
     public static class SceneTreeCommand
     {
@@ -43,49 +28,81 @@ namespace UnityPythonBridge.Commands
             bool withComponents = args.components;
 
             var scene = SceneManager.GetActiveScene();
-            var result = new SceneTreeResult
-            {
-                type = "scene",
-                name = scene.name,
-                path = scene.path,
-                buildIndex = scene.buildIndex,
-                rootCount = scene.rootCount
-            };
+            var roots = scene.GetRootGameObjects();
 
-            foreach (var go in scene.GetRootGameObjects())
+            var sb = new StringBuilder(4096);
+            sb.Append("{\"type\":\"scene\"");
+            sb.Append(",\"name\":").Append(JsonString(scene.name));
+            sb.Append(",\"path\":").Append(JsonString(scene.path));
+            sb.Append(",\"buildIndex\":").Append(scene.buildIndex);
+            sb.Append(",\"rootCount\":").Append(roots.Length);
+            sb.Append(",\"roots\":[");
+            for (var i = 0; i < roots.Length; i++)
             {
-                result.roots.Add(Describe(go.transform, withComponents));
+                if (i > 0) sb.Append(',');
+                AppendNode(sb, roots[i].transform, withComponents);
             }
-
-            return result;
+            sb.Append("]}");
+            return sb.ToString();
         }
 
-        private static SceneTreeNode Describe(Transform t, bool withComponents)
+        /// <summary>递归构建单个节点 JSON（无深度限制）。</summary>
+        private static void AppendNode(StringBuilder sb, Transform t, bool withComponents)
         {
-            var node = new SceneTreeNode
-            {
-                name = t.gameObject.name,
-                active = t.gameObject.activeSelf
-            };
+            var go = t.gameObject;
+            sb.Append("{\"name\":").Append(JsonString(go.name));
+            sb.Append(",\"active\":").Append(go.activeSelf ? "true" : "false");
 
             if (withComponents)
             {
-                node.components = new List<string>();
-                foreach (var c in t.gameObject.GetComponents<Component>())
+                sb.Append(",\"components\":[");
+                bool first = true;
+                foreach (var c in go.GetComponents<Component>())
                 {
                     if (c == null) continue;
-                    node.components.Add(c.GetType().Name);
+                    if (!first) sb.Append(',');
+                    first = false;
+                    sb.Append(JsonString(c.GetType().Name));
                 }
+                sb.Append(']');
             }
 
+            sb.Append(",\"children\":[");
+            bool firstChild = true;
             for (var i = 0; i < t.childCount; i++)
             {
                 var child = t.GetChild(i);
                 if (child == null) continue;
-                node.children.Add(Describe(child, withComponents));
+                if (!firstChild) sb.Append(',');
+                firstChild = false;
+                AppendNode(sb, child, withComponents);
             }
+            sb.Append("]}");
+        }
 
-            return node;
+        /// <summary>把字符串转义为 JSON 字符串字面量（含引号）。</summary>
+        private static string JsonString(string s)
+        {
+            if (s == null) return "\"\"";
+            var sb = new StringBuilder(s.Length + 8);
+            sb.Append('"');
+            foreach (var c in s)
+            {
+                switch (c)
+                {
+                    case '"': sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\n': sb.Append("\\n"); break;
+                    case '\r': sb.Append("\\r"); break;
+                    case '\t': sb.Append("\\t"); break;
+                    default:
+                        if (c < 0x20) sb.Append("\\u").Append(((int)c).ToString("x4"));
+                        else sb.Append(c);
+                        break;
+                }
+            }
+            sb.Append('"');
+            return sb.ToString();
         }
     }
 }
