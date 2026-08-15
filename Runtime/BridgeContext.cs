@@ -15,20 +15,17 @@ namespace UnityPythonBridge
     }
 
     /// <summary>
-    /// 命令参数（强类型）。由 JsonUtility 从请求 args 反序列化，
-    /// 未提供的字段保持默认值（bool=false, 数值=0, string=null, Vector3=zero）。
-    /// 新增命令需要新参数时，在此追加字段即可（注意保持 JSON 键名与字段名一致）。
+    /// 请求参数（强类型，JsonUtility 反序列化；未提供的字段保持默认值）。
+    /// 新增命令若需要新参数，在此追加字段即可（字段名即 JSON 键名，建议小驼峰）。
     /// </summary>
     [Serializable]
     public class BridgeArgs
     {
-        // scene.tree
+        // ---- scene.tree ----
         public bool components;
 
-        // mesh.bounds / prefab.screenshot
+        // ---- mesh.bounds / prefab.screenshot ----
         public string path;
-
-        // prefab.screenshot
         public string output;
         public Vector3 offset;
         public bool orthographic;
@@ -37,11 +34,39 @@ namespace UnityPythonBridge
         public int height;
         public string bg;
         public float light;
+
+        // ---- terrain 通用 ----
+        /// <summary>目标 Terrain 的 GameObject 名称；省略时取场景中第一个 Terrain。</summary>
+        public string terrain;
+
+        // ---- terrain 区域（高度图/纹理/植被均用 xBase/zBase 起始 + width/height 范围）----
+        public int xBase;
+        public int zBase;
+
+        // ---- 数组数据（高度/纹理权重/植被密度，行优先展平）----
+        public float[] data;
+        public int[] dataInt;
+
+        // ---- terrain.set_heights 噪声生成 ----
+        public bool noise;
+        public float noiseScale;
+        public int noiseSeed;
+        public float baseHeight;
+        public float heightScale;
+
+        // ---- terrain 植被 / 树木 ----
+        public int layer;
+        public int prototypeIndex;  // 树原型索引（terrain.add_trees 使用）
+        public int count;
+        public int seed;
+        public int density;
+        public float minScale;
+        public float maxScale;
+        public float[] positions;   // 树木位置列表，每 3 个一组 {x, y, z}（归一化 0~1）
+        public bool random;
     }
 
-    /// <summary>
-    /// TCP 请求行 { id, cmd, args } 的强类型定义。
-    /// </summary>
+    /// <summary>TCP 请求行：{id, cmd, args}。</summary>
     [Serializable]
     public class BridgeRequest
     {
@@ -54,7 +79,7 @@ namespace UnityPythonBridge
     /// 命令处理器委托。与 [BridgeCommand] 标记的方法签名一致。
     /// </summary>
     /// <param name="ctx">执行上下文</param>
-    /// <param name="args">请求参数（强类型，可空）</param>
+    /// <param name="args">请求参数（强类型 BridgeArgs，字段缺省为默认值）</param>
     /// <returns>任意可被 JsonUtility 序列化的结果（[Serializable] 类 / List / 基本类型）</returns>
     public delegate object BridgeCommandHandler(BridgeContext ctx, BridgeArgs args);
 

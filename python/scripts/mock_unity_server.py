@@ -47,7 +47,40 @@ COMMANDS = [
     {"name": "scene.tree", "description": "以树状结构返回当前场景中的物体层级。参数: components(bool)"},
     {"name": "mesh.bounds", "description": "计算 Assets 中网格/模型/预制体的轴对齐包围盒。参数: path(string)"},
     {"name": "prefab.screenshot", "description": "将预制体复制到场景隔离位置并截图保存为 PNG。参数: path(string), offset{x,y,z}, output(string,.png), orthographic(bool), fov(number), width(int), height(int), bg(string)"},
+    {"name": "terrain.list", "description": "列出场景中所有 Terrain。参数: terrain(string,可选)"},
+    {"name": "terrain.get_heights", "description": "读取高度图区域。参数: terrain, xBase, zBase, width, height"},
+    {"name": "terrain.set_heights", "description": "写入高度图。参数: terrain, xBase, zBase, width, height, data(float[]) 或 noise/noiseScale/noiseSeed/baseHeight/heightScale"},
+    {"name": "terrain.get_layers", "description": "列出 Terrain 纹理层。参数: terrain(string,可选)"},
+    {"name": "terrain.get_alphamaps", "description": "读取纹理混合权重。参数: terrain, xBase, zBase, width, height"},
+    {"name": "terrain.set_alphamaps", "description": "写入纹理混合权重。参数: terrain, xBase, zBase, width, height, data(float[])"},
+    {"name": "terrain.list_details", "description": "列出 Terrain 草原型。参数: terrain(string,可选)"},
+    {"name": "terrain.get_details", "description": "读取某层植被密度图。参数: terrain, layer, xBase, zBase, width, height"},
+    {"name": "terrain.set_details", "description": "写入植被密度。参数: terrain, layer, xBase, zBase, width, height, data(int[]) 或 random/count/seed/density"},
+    {"name": "terrain.list_trees", "description": "列出 Terrain 树原型与树实例。参数: terrain(string,可选)"},
+    {"name": "terrain.add_trees", "description": "添加树木。参数: terrain, prototypeIndex, positions(float[]) 或 random/count/seed/minScale/maxScale"},
+    {"name": "terrain.clear_trees", "description": "清空 Terrain 上所有树实例。参数: terrain(string,可选)"},
 ]
+
+# 离线模拟的 Terrain 状态（仅用于无 Unity 环境联调）
+MOCK_TERRAIN = {
+    "name": "MainTerrain",
+    "position": {"x": 0, "y": 0, "z": 0},
+    "size": {"x": 1000, "y": 600, "z": 1000},
+    "heightmapResolution": 513,
+    "alphamapResolution": 512,
+    "detailResolution": 1024,
+    "holesResolution": 512,
+    "layers": [
+        {"index": 0, "name": "Grass", "diffuseTexture": "Assets/Textures/grass.jpg"},
+        {"index": 1, "name": "Rock", "diffuseTexture": "Assets/Textures/rock.jpg"},
+    ],
+    "details": [{"index": 0, "name": "TallGrass"}],
+    "trees": [{"index": 0, "name": "OakTree"}],
+    "heightmap": {},   # {(x,z): height} 模拟高度图局部修改
+    "alphamap": {},    # {(x,z,layer): weight}
+    "detail": {},      # {(x,z): density}
+    "tree_instances": [],  # [{prototypeIndex, x, y, z, widthScale, heightScale}]
+}
 
 
 def handle_client(client: socket.socket) -> None:
@@ -79,6 +112,30 @@ def handle_client(client: socket.socket) -> None:
                     data = mock_mesh_bounds(args.get("path", ""))
                 elif cmd == "prefab.screenshot":
                     data = mock_screenshot(args)
+                elif cmd == "terrain.list":
+                    data = mock_terrain_list()
+                elif cmd == "terrain.get_heights":
+                    data = mock_get_heights(args)
+                elif cmd == "terrain.set_heights":
+                    data = mock_set_heights(args)
+                elif cmd == "terrain.get_layers":
+                    data = mock_get_layers()
+                elif cmd == "terrain.get_alphamaps":
+                    data = mock_get_alphamaps(args)
+                elif cmd == "terrain.set_alphamaps":
+                    data = mock_set_alphamaps(args)
+                elif cmd == "terrain.list_details":
+                    data = mock_list_details()
+                elif cmd == "terrain.get_details":
+                    data = mock_get_details(args)
+                elif cmd == "terrain.set_details":
+                    data = mock_set_details(args)
+                elif cmd == "terrain.list_trees":
+                    data = mock_list_trees()
+                elif cmd == "terrain.add_trees":
+                    data = mock_add_trees(args)
+                elif cmd == "terrain.clear_trees":
+                    data = mock_clear_trees()
                 else:
                     raise KeyError(f"未知命令: {cmd}")
                 resp = {"id": req.get("id"), "ok": True, "data": data}
@@ -171,6 +228,210 @@ def mock_mesh_bounds(path: str) -> dict:
         "size": {"x": 8, "y": 2.5, "z": 5},
         "format": "x:-2~6, y:-0.5~2, z:1~6",
     }
+
+
+# ============ Terrain 模拟命令 ============
+
+
+def _region(args, res_w, res_h):
+    """解析区域参数，返回 (xb, zb, w, h)。"""
+    xb = int(args.get("xBase", 0))
+    zb = int(args.get("zBase", 0))
+    w = int(args.get("width", 0)) or (res_w - xb)
+    h = int(args.get("height", 0)) or (res_h - zb)
+    return xb, zb, w, h
+
+
+def mock_terrain_list() -> dict:
+    t = MOCK_TERRAIN
+    return {
+        "count": 1,
+        "terrains": [{
+            "name": t["name"],
+            "position": t["position"],
+            "size": t["size"],
+            "heightmapResolution": t["heightmapResolution"],
+            "alphamapResolution": t["alphamapResolution"],
+            "detailResolution": t["detailResolution"],
+            "holesResolution": t["holesResolution"],
+            "layers": len(t["layers"]),
+            "detailPrototypeCount": len(t["details"]),
+            "treePrototypeCount": len(t["trees"]),
+            "treeInstanceCount": len(t["tree_instances"]),
+        }],
+    }
+
+
+def mock_get_heights(args: dict) -> dict:
+    t = MOCK_TERRAIN
+    xb, zb, w, h = _region(args, t["heightmapResolution"], t["heightmapResolution"])
+    data = []
+    for y in range(h):
+        for x in range(w):
+            data.append(t["heightmap"].get((xb + x, zb + y), 0.5))
+    return {"terrain": t["name"], "xBase": xb, "zBase": zb, "width": w, "height": h,
+            "data": data, "count": len(data)}
+
+
+def mock_set_heights(args: dict) -> dict:
+    t = MOCK_TERRAIN
+    xb, zb, w, h = _region(args, t["heightmapResolution"], t["heightmapResolution"])
+    data = args.get("data") or []
+    if not data:
+        # noise 模式：生成简单正弦/伪噪声，仅用于联调
+        import random as _r
+        rng = _r.Random(int(args.get("noiseSeed", 0)))
+        ox, oz = rng.random() * 100, rng.random() * 100
+        scale = float(args.get("noiseScale", 1.0))
+        base = float(args.get("baseHeight", 0.0))
+        amp = float(args.get("heightScale", 1.0))
+        for y in range(h):
+            for x in range(w):
+                v = base + amp * ((1 + __import__("math").sin((xb + x + ox) * scale * 0.1 + (zb + y + oz) * scale * 0.1)) / 2)
+                t["heightmap"][(xb + x, zb + y)] = max(0.0, min(1.0, v))
+    else:
+        for y in range(h):
+            for x in range(w):
+                idx = y * w + x
+                if idx < len(data):
+                    t["heightmap"][(xb + x, zb + y)] = max(0.0, min(1.0, float(data[idx])))
+    return {"terrain": t["name"], "xBase": xb, "zBase": zb, "width": w, "height": h,
+            "cells": w * h, "mode": "noise" if not data else "data"}
+
+
+def mock_get_layers() -> dict:
+    t = MOCK_TERRAIN
+    return {"terrain": t["name"], "count": len(t["layers"]), "layers": t["layers"]}
+
+
+def mock_get_alphamaps(args: dict) -> dict:
+    t = MOCK_TERRAIN
+    xb, zb, w, h = _region(args, t["alphamapResolution"], t["alphamapResolution"])
+    layers = len(t["layers"])
+    data = []
+    for y in range(h):
+        for x in range(w):
+            for l in range(layers):
+                data.append(t["alphamap"].get((xb + x, zb + y, l), 1.0 if l == 0 else 0.0))
+    return {"terrain": t["name"], "xBase": xb, "zBase": zb, "width": w, "height": h,
+            "layers": layers, "data": data, "count": len(data)}
+
+
+def mock_set_alphamaps(args: dict) -> dict:
+    t = MOCK_TERRAIN
+    xb, zb, w, h = _region(args, t["alphamapResolution"], t["alphamapResolution"])
+    layers = len(t["layers"])
+    data = args.get("data") or []
+    for y in range(h):
+        for x in range(w):
+            s = 0.0
+            for l in range(layers):
+                idx = (y * w + x) * layers + l
+                v = float(data[idx]) if idx < len(data) else 0.0
+                t["alphamap"][(xb + x, zb + y, l)] = v
+                s += v
+            if s > 1.0001:
+                for l in range(layers):
+                    t["alphamap"][(xb + x, zb + y, l)] /= s
+    return {"terrain": t["name"], "xBase": xb, "zBase": zb, "width": w, "height": h,
+            "layers": layers, "cells": w * h, "normalized": True}
+
+
+def mock_list_details() -> dict:
+    t = MOCK_TERRAIN
+    return {"terrain": t["name"], "count": len(t["details"]), "details": t["details"]}
+
+
+def mock_get_details(args: dict) -> dict:
+    t = MOCK_TERRAIN
+    layer = int(args.get("layer", 0))
+    xb, zb, w, h = _region(args, t["detailResolution"], t["detailResolution"])
+    data = []
+    for y in range(h):
+        for x in range(w):
+            data.append(t["detail"].get((layer, xb + x, zb + y), 0))
+    return {"terrain": t["name"], "layer": layer, "xBase": xb, "zBase": zb,
+            "width": w, "height": h, "data": data, "count": len(data)}
+
+
+def mock_set_details(args: dict) -> dict:
+    t = MOCK_TERRAIN
+    layer = int(args.get("layer", 0))
+    xb, zb, w, h = _region(args, t["detailResolution"], t["detailResolution"])
+    if args.get("random"):
+        import random as _r
+        rng = _r.Random(int(args.get("seed", 0)))
+        density = int(args.get("density", 3))
+        for _ in range(int(args.get("count", 0))):
+            x = xb + rng.randrange(w)
+            z = zb + rng.randrange(h)
+            t["detail"][(layer, x, z)] = density
+        mode = "random"
+    else:
+        data = args.get("data") or []
+        for y in range(h):
+            for x in range(w):
+                idx = y * w + x
+                if idx < len(data):
+                    t["detail"][(layer, xb + x, zb + y)] = max(0, min(16, int(data[idx])))
+        mode = "data"
+    return {"terrain": t["name"], "layer": layer, "xBase": xb, "zBase": zb,
+            "width": w, "height": h, "cells": w * h, "mode": mode}
+
+
+def mock_list_trees() -> dict:
+    t = MOCK_TERRAIN
+    return {
+        "terrain": t["name"],
+        "prototypeCount": len(t["trees"]),
+        "instanceCount": len(t["tree_instances"]),
+        "prototypes": t["trees"],
+        "instances": [
+            {"index": i, "prototypeIndex": ti["prototypeIndex"],
+             "position": {"x": ti["x"], "y": ti["y"], "z": ti["z"]},
+             "widthScale": ti["widthScale"], "heightScale": ti["heightScale"]}
+            for i, ti in enumerate(t["tree_instances"])
+        ],
+    }
+
+
+def mock_add_trees(args: dict) -> dict:
+    t = MOCK_TERRAIN
+    pi = int(args.get("prototypeIndex", 0))
+    positions = args.get("positions") or []
+    if positions:
+        mode = "positions"
+        added = len(positions) // 3
+        for i in range(0, len(positions) - 2, 3):
+            t["tree_instances"].append({
+                "prototypeIndex": pi,
+                "x": positions[i], "y": positions[i + 1], "z": positions[i + 2],
+                "widthScale": 1.0, "heightScale": 1.0,
+            })
+    else:
+        import random as _r
+        mode = "random"
+        rng = _r.Random(int(args.get("seed", 0)))
+        count = int(args.get("count", 0))
+        min_s = float(args.get("minScale", 0.8))
+        max_s = float(args.get("maxScale", 1.2))
+        added = count
+        for _ in range(count):
+            t["tree_instances"].append({
+                "prototypeIndex": pi,
+                "x": rng.random(), "y": 0.5, "z": rng.random(),
+                "widthScale": min_s + rng.random() * (max_s - min_s),
+                "heightScale": min_s + rng.random() * (max_s - min_s),
+            })
+    return {"terrain": t["name"], "prototypeIndex": pi, "added": added,
+            "total": len(t["tree_instances"]), "mode": mode}
+
+
+def mock_clear_trees() -> dict:
+    t = MOCK_TERRAIN
+    removed = len(t["tree_instances"])
+    t["tree_instances"].clear()
+    return {"terrain": t["name"], "removed": removed}
 
 
 def main() -> None:

@@ -148,6 +148,208 @@ def _cmd_screenshot(args) -> int:
     return 0
 
 
+# ============ Terrain 程序化编辑命令 ============
+
+
+def _parse_floats(s):
+    """把 '1,2,3' / '1 2 3' 解析为 float 列表。"""
+    parts = s.replace(",", " ").split()
+    return [float(x) for x in parts]
+
+
+def _parse_ints(s):
+    parts = s.replace(",", " ").split()
+    return [int(x) for x in parts]
+
+
+def _cmd_terrain_list(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.terrain_list(args.terrain)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"count: {data.get('count')}")
+    for t in data.get("terrains", []):
+        pos = t.get("position", {})
+        size = t.get("size", {})
+        print(f"  {t.get('name')}  pos=({pos.get('x')},{pos.get('y')},{pos.get('z')}) "
+              f"size=({size.get('x')},{size.get('y')},{size.get('z')})")
+        print(f"      heightmap={t.get('heightmapResolution')} "
+              f"alphamap={t.get('alphamapResolution')} detail={t.get('detailResolution')} "
+              f"layers={t.get('layers')} trees={t.get('treeInstanceCount')}")
+    return 0
+
+
+def _cmd_terrain_get_heights(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.get_heights(args.terrain, args.xBase, args.zBase, args.width, args.height)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  region: "
+          f"xBase={data.get('xBase')} zBase={data.get('zBase')} {data.get('width')}x{data.get('height')}")
+    d = data.get("data", [])
+    print(f"count  : {data.get('count')}")
+    if d:
+        print(f"range  : min={min(d):.4f} max={max(d):.4f}  (前8个: {[round(v,4) for v in d[:8]]})")
+    return 0
+
+
+def _cmd_terrain_set_heights(args) -> int:
+    data = _parse_floats(args.data) if args.data else None
+    if data is None and not args.noise:
+        print("[错误] 必须提供 --data 或 --noise", file=sys.stderr)
+        return 1
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.set_heights(
+            args.terrain, args.xBase, args.zBase, args.width, args.height,
+            data=data, noise=args.noise, noise_scale=args.noiseScale,
+            noise_seed=args.noiseSeed, base_height=args.baseHeight,
+            height_scale=args.heightScale)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  mode={data.get('mode')}  "
+          f"region: {data.get('width')}x{data.get('height')}  cells={data.get('cells')}")
+    return 0
+
+
+def _cmd_terrain_get_layers(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.get_layers(args.terrain)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  count: {data.get('count')}")
+    for l in data.get("layers", []):
+        tex = l.get("diffuseTexture") or "(无贴图)"
+        print(f"  [{l.get('index')}] {l.get('name')}  {tex}")
+    return 0
+
+
+def _cmd_terrain_get_alphamaps(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.get_alphamaps(args.terrain, args.xBase, args.zBase, args.width, args.height)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  region: "
+          f"xBase={data.get('xBase')} zBase={data.get('zBase')} "
+          f"{data.get('width')}x{data.get('height')}  layers={data.get('layers')}")
+    d = data.get("data", [])
+    print(f"count  : {data.get('count')}")
+    if d:
+        print(f"range  : min={min(d):.4f} max={max(d):.4f}  (前8个: {[round(v,4) for v in d[:8]]})")
+    return 0
+
+
+def _cmd_terrain_set_alphamaps(args) -> int:
+    data = _parse_floats(args.data)
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.set_alphamaps(args.terrain, args.xBase, args.zBase,
+                                    args.width, args.height, data=data)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  region: "
+          f"{data.get('width')}x{data.get('height')}  layers={data.get('layers')}  "
+          f"cells={data.get('cells')}  normalized={data.get('normalized')}")
+    return 0
+
+
+def _cmd_terrain_list_details(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.list_details(args.terrain)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  count: {data.get('count')}")
+    for d in data.get("details", []):
+        print(f"  [{d.get('index')}] {d.get('name')}")
+    return 0
+
+
+def _cmd_terrain_get_details(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.get_details(args.terrain, args.layer, args.xBase, args.zBase,
+                                  args.width, args.height)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  layer={data.get('layer')}  region: "
+          f"xBase={data.get('xBase')} zBase={data.get('zBase')} "
+          f"{data.get('width')}x{data.get('height')}")
+    d = data.get("data", [])
+    print(f"count  : {data.get('count')}  range: {min(d) if d else 0}~{max(d) if d else 0}")
+    return 0
+
+
+def _cmd_terrain_set_details(args) -> int:
+    data = _parse_ints(args.data) if args.data else None
+    if data is None and not args.random:
+        print("[错误] 必须提供 --data 或 --random", file=sys.stderr)
+        return 1
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.set_details(args.terrain, args.layer, args.xBase, args.zBase,
+                                  args.width, args.height, data=data, random=args.random,
+                                  count=args.count, seed=args.seed, density=args.density)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  layer={data.get('layer')}  mode={data.get('mode')}  "
+          f"region: {data.get('width')}x{data.get('height')}  cells={data.get('cells')}")
+    return 0
+
+
+def _cmd_terrain_list_trees(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.list_trees(args.terrain)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}")
+    print(f"prototypes: {data.get('prototypeCount')}")
+    for p in data.get("prototypes", []):
+        print(f"  [{p.get('index')}] {p.get('name')}")
+    insts = data.get("instances", [])
+    print(f"instances: {data.get('instanceCount')}")
+    for t in insts[:10]:
+        pos = t.get("position", {})
+        print(f"  [{t.get('index')}] proto={t.get('prototypeIndex')} "
+              f"pos=({pos.get('x'):.3f},{pos.get('y'):.3f},{pos.get('z'):.3f}) "
+              f"scale={t.get('widthScale'):.2f}")
+    if len(insts) > 10:
+        print(f"  ... 共 {len(insts)} 棵")
+    return 0
+
+
+def _cmd_terrain_add_trees(args) -> int:
+    positions = _parse_floats(args.positions) if args.positions else None
+    if positions is None and not args.random:
+        print("[错误] 必须提供 --positions 或 --random", file=sys.stderr)
+        return 1
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.add_trees(args.terrain, args.prototypeIndex, positions=positions,
+                                random=args.random, count=args.count, seed=args.seed,
+                                min_scale=args.minScale, max_scale=args.maxScale)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  prototype={data.get('prototypeIndex')}  "
+          f"mode={data.get('mode')}  added={data.get('added')}  total={data.get('total')}")
+    return 0
+
+
+def _cmd_terrain_clear_trees(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.clear_trees(args.terrain)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  removed={data.get('removed')}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="unity-bridge",
@@ -192,6 +394,127 @@ def build_parser() -> argparse.ArgumentParser:
                         help="补光强度（默认 0 不补光；>0 时追加与相机同向平行光）")
     p_shot.add_argument("--json", action="store_true", help="输出原始 JSON 而非文本")
     p_shot.set_defaults(func=_cmd_screenshot)
+
+    # ============ Terrain 程序化编辑 ============
+
+    p_tlist = sub.add_parser("terrain-list", aliases=["tlist"],
+                             help="列出场景中所有 Terrain（名称/位置/尺寸/分辨率）")
+    p_tlist.add_argument("--terrain", default=None, help="目标 Terrain 名称（省略=第一个）")
+    p_tlist.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_tlist.set_defaults(func=_cmd_terrain_list)
+
+    p_tget = sub.add_parser("terrain-get-heights", aliases=["tget"],
+                            help="读取高度图区域")
+    p_tget.add_argument("--terrain", default=None, help="目标 Terrain 名称（省略=第一个）")
+    p_tget.add_argument("--xBase", type=int, default=0)
+    p_tget.add_argument("--zBase", type=int, default=0)
+    p_tget.add_argument("--width", type=int, default=0, help="区域宽（省略=到边界）")
+    p_tget.add_argument("--height", type=int, default=0, help="区域高（省略=到边界）")
+    p_tget.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_tget.set_defaults(func=_cmd_terrain_get_heights)
+
+    p_tset = sub.add_parser("terrain-set-heights", aliases=["tset"],
+                            help="写入高度图（data 数组或 noise 噪声生成）")
+    p_tset.add_argument("--terrain", default=None)
+    p_tset.add_argument("--xBase", type=int, default=0)
+    p_tset.add_argument("--zBase", type=int, default=0)
+    p_tset.add_argument("--width", type=int, default=0)
+    p_tset.add_argument("--height", type=int, default=0)
+    p_tset.add_argument("--data", default=None, help="高度数组（逗号分隔，行优先，0~1）")
+    p_tset.add_argument("--noise", action="store_true", help="用 Perlin 噪声生成")
+    p_tset.add_argument("--noiseScale", type=float, default=1.0)
+    p_tset.add_argument("--noiseSeed", type=int, default=0)
+    p_tset.add_argument("--baseHeight", type=float, default=0.0)
+    p_tset.add_argument("--heightScale", type=float, default=1.0)
+    p_tset.add_argument("--json", action="store_true")
+    p_tset.set_defaults(func=_cmd_terrain_set_heights)
+
+    p_tlayers = sub.add_parser("terrain-get-layers", aliases=["tlayer"],
+                               help="列出 Terrain 的纹理层（TerrainLayer）")
+    p_tlayers.add_argument("--terrain", default=None)
+    p_tlayers.add_argument("--json", action="store_true")
+    p_tlayers.set_defaults(func=_cmd_terrain_get_layers)
+
+    p_tamap = sub.add_parser("terrain-get-alphamaps", aliases=["tamap"],
+                             help="读取纹理混合权重")
+    p_tamap.add_argument("--terrain", default=None)
+    p_tamap.add_argument("--xBase", type=int, default=0)
+    p_tamap.add_argument("--zBase", type=int, default=0)
+    p_tamap.add_argument("--width", type=int, default=0)
+    p_tamap.add_argument("--height", type=int, default=0)
+    p_tamap.add_argument("--json", action="store_true")
+    p_tamap.set_defaults(func=_cmd_terrain_get_alphamaps)
+
+    p_tsamap = sub.add_parser("terrain-set-alphamaps", aliases=["tsamap"],
+                              help="写入纹理混合权重（每像素自动归一化）")
+    p_tsamap.add_argument("--terrain", default=None)
+    p_tsamap.add_argument("--xBase", type=int, default=0)
+    p_tsamap.add_argument("--zBase", type=int, default=0)
+    p_tsamap.add_argument("--width", type=int, default=0)
+    p_tsamap.add_argument("--height", type=int, default=0)
+    p_tsamap.add_argument("--data", required=True,
+                          help="权重数组（逗号分隔，index=(y*width+x)*layers+layer）")
+    p_tsamap.add_argument("--json", action="store_true")
+    p_tsamap.set_defaults(func=_cmd_terrain_set_alphamaps)
+
+    p_tdlist = sub.add_parser("terrain-list-details", aliases=["tdlist"],
+                              help="列出 Terrain 的草原型（DetailPrototype）")
+    p_tdlist.add_argument("--terrain", default=None)
+    p_tdlist.add_argument("--json", action="store_true")
+    p_tdlist.set_defaults(func=_cmd_terrain_list_details)
+
+    p_tdget = sub.add_parser("terrain-get-details", aliases=["tdget"],
+                             help="读取某层植被密度图")
+    p_tdget.add_argument("--terrain", default=None)
+    p_tdget.add_argument("--layer", type=int, required=True)
+    p_tdget.add_argument("--xBase", type=int, default=0)
+    p_tdget.add_argument("--zBase", type=int, default=0)
+    p_tdget.add_argument("--width", type=int, default=0)
+    p_tdget.add_argument("--height", type=int, default=0)
+    p_tdget.add_argument("--json", action="store_true")
+    p_tdget.set_defaults(func=_cmd_terrain_get_details)
+
+    p_tdset = sub.add_parser("terrain-set-details", aliases=["tdset"],
+                             help="写入植被密度（data 数组或 random 随机撒点）")
+    p_tdset.add_argument("--terrain", default=None)
+    p_tdset.add_argument("--layer", type=int, required=True)
+    p_tdset.add_argument("--xBase", type=int, default=0)
+    p_tdset.add_argument("--zBase", type=int, default=0)
+    p_tdset.add_argument("--width", type=int, default=0)
+    p_tdset.add_argument("--height", type=int, default=0)
+    p_tdset.add_argument("--data", default=None, help="密度数组（逗号分隔，0~16）")
+    p_tdset.add_argument("--random", action="store_true", help="随机撒点")
+    p_tdset.add_argument("--count", type=int, default=0)
+    p_tdset.add_argument("--seed", type=int, default=0)
+    p_tdset.add_argument("--density", type=int, default=3)
+    p_tdset.add_argument("--json", action="store_true")
+    p_tdset.set_defaults(func=_cmd_terrain_set_details)
+
+    p_ttlist = sub.add_parser("terrain-list-trees", aliases=["ttlist"],
+                              help="列出 Terrain 的树原型与树实例")
+    p_ttlist.add_argument("--terrain", default=None)
+    p_ttlist.add_argument("--json", action="store_true")
+    p_ttlist.set_defaults(func=_cmd_terrain_list_trees)
+
+    p_ttadd = sub.add_parser("terrain-add-trees", aliases=["ttadd"],
+                             help="添加树木（positions 数组或 random 随机种植）")
+    p_ttadd.add_argument("--terrain", default=None)
+    p_ttadd.add_argument("--prototypeIndex", type=int, required=True)
+    p_ttadd.add_argument("--positions", default=None,
+                         help="位置数组（逗号分隔，每 3 个一组 {x,y,z} 归一化 0~1）")
+    p_ttadd.add_argument("--random", action="store_true", help="随机种植")
+    p_ttadd.add_argument("--count", type=int, default=0)
+    p_ttadd.add_argument("--seed", type=int, default=0)
+    p_ttadd.add_argument("--minScale", type=float, default=0.8)
+    p_ttadd.add_argument("--maxScale", type=float, default=1.2)
+    p_ttadd.add_argument("--json", action="store_true")
+    p_ttadd.set_defaults(func=_cmd_terrain_add_trees)
+
+    p_ttclear = sub.add_parser("terrain-clear-trees", aliases=["ttclear"],
+                               help="清空 Terrain 上所有树实例")
+    p_ttclear.add_argument("--terrain", default=None)
+    p_ttclear.add_argument("--json", action="store_true")
+    p_ttclear.set_defaults(func=_cmd_terrain_clear_trees)
 
     return parser
 

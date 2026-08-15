@@ -125,6 +125,96 @@ class UnityClient:
             args["bg"] = bg
         return self.call("prefab.screenshot", **args)
 
+    # ---- Terrain 程序化编辑（Unity 原生 TerrainData API）----
+
+    def terrain_list(self, terrain: str = None) -> dict:
+        """列出场景中所有 Terrain（名称/位置/尺寸/分辨率等）。"""
+        return self.call("terrain.list", terrain=terrain)
+
+    def get_heights(self, terrain: str = None, x_base: int = 0, z_base: int = 0,
+                    width: int = 0, height: int = 0) -> dict:
+        """读取高度图区域，data 行优先 index=y*width+x，值 0~1。"""
+        return self.call("terrain.get_heights", terrain=terrain,
+                         xBase=x_base, zBase=z_base, width=width, height=height)
+
+    def set_heights(self, terrain: str = None, x_base: int = 0, z_base: int = 0,
+                    width: int = 0, height: int = 0, data=None,
+                    noise: bool = False, noise_scale: float = 1.0, noise_seed: int = 0,
+                    base_height: float = 0.0, height_scale: float = 1.0) -> dict:
+        """写入高度图：data（float[] 行优先 0~1）或 noise（Perlin 噪声生成）。"""
+        args = dict(terrain=terrain, xBase=x_base, zBase=z_base,
+                    width=width, height=height, noise=noise)
+        if data is not None:
+            args["data"] = list(data)
+        if noise:
+            args.update(noiseScale=noise_scale, noiseSeed=noise_seed,
+                        baseHeight=base_height, heightScale=height_scale)
+        return self.call("terrain.set_heights", **args)
+
+    def get_layers(self, terrain: str = None) -> dict:
+        """列出 Terrain 的纹理层（TerrainLayer）。"""
+        return self.call("terrain.get_layers", terrain=terrain)
+
+    def get_alphamaps(self, terrain: str = None, x_base: int = 0, z_base: int = 0,
+                      width: int = 0, height: int = 0) -> dict:
+        """读取纹理混合权重，data index=(y*width+x)*layers+layer。"""
+        return self.call("terrain.get_alphamaps", terrain=terrain,
+                         xBase=x_base, zBase=z_base, width=width, height=height)
+
+    def set_alphamaps(self, terrain: str = None, x_base: int = 0, z_base: int = 0,
+                      width: int = 0, height: int = 0, data=None) -> dict:
+        """写入纹理混合权重（每像素自动归一化）。data 长度=width*height*layers。"""
+        args = dict(terrain=terrain, xBase=x_base, zBase=z_base,
+                    width=width, height=height)
+        if data is not None:
+            args["data"] = list(data)
+        return self.call("terrain.set_alphamaps", **args)
+
+    def list_details(self, terrain: str = None) -> dict:
+        """列出 Terrain 的草原型（DetailPrototype）。"""
+        return self.call("terrain.list_details", terrain=terrain)
+
+    def get_details(self, terrain: str = None, layer: int = 0,
+                    x_base: int = 0, z_base: int = 0,
+                    width: int = 0, height: int = 0) -> dict:
+        """读取某层植被密度图，data 行优先 index=y*width+x。"""
+        return self.call("terrain.get_details", terrain=terrain, layer=layer,
+                         xBase=x_base, zBase=z_base, width=width, height=height)
+
+    def set_details(self, terrain: str = None, layer: int = 0,
+                    x_base: int = 0, z_base: int = 0,
+                    width: int = 0, height: int = 0, data=None,
+                    random: bool = False, count: int = 0, seed: int = 0,
+                    density: int = 3) -> dict:
+        """写入植被密度：data（int[] 行优先 0~16）或 random 随机撒点。"""
+        args = dict(terrain=terrain, layer=layer, xBase=x_base, zBase=z_base,
+                    width=width, height=height, random=random)
+        if data is not None:
+            args["dataInt"] = list(data)
+        if random:
+            args.update(count=count, seed=seed, density=density)
+        return self.call("terrain.set_details", **args)
+
+    def list_trees(self, terrain: str = None) -> dict:
+        """列出 Terrain 的树原型与树实例。"""
+        return self.call("terrain.list_trees", terrain=terrain)
+
+    def add_trees(self, terrain: str = None, prototype_index: int = 0,
+                  positions=None, random: bool = False, count: int = 0,
+                  seed: int = 0, min_scale: float = 0.8, max_scale: float = 1.2) -> dict:
+        """添加树木：positions（float[] 每3个一组 {x,y,z} 归一化）或 random 随机种植。"""
+        args = dict(terrain=terrain, prototypeIndex=prototype_index)
+        if positions is not None:
+            args["positions"] = list(positions)
+        if random:
+            args.update(random=True, count=count, seed=seed,
+                        minScale=min_scale, maxScale=max_scale)
+        return self.call("terrain.add_trees", **args)
+
+    def clear_trees(self, terrain: str = None) -> dict:
+        """清空 Terrain 上所有树实例。"""
+        return self.call("terrain.clear_trees", terrain=terrain)
+
     # ---- 内部 ----
 
     def _ensure_connected(self) -> None:

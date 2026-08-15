@@ -102,7 +102,9 @@ python -m unity_bridge tree --components
 
 ---
 
-## 三、命令总览（5 条）
+## 三、命令总览（5 条原生命令 + 12 条 Terrain 命令）
+
+### A. 原生命令（5 条）
 
 | 命令 (bus name) | 类别 | 功能 | Python CLI | 关键参数 |
 |---|---|---|---|---|
@@ -111,6 +113,59 @@ python -m unity_bridge tree --components
 | `prefab.screenshot` | 资源查询 | 隔离复制 prefab 到 `(9999,9999,9999)` + 相机环绕 `LookAt` 渲染存 PNG（支持正交/透视、`fov`、`bg`、补光） | `screenshot`（`shot`） | `path`、`output`(.png)、`offset`("x,y,z")、`orthographic`、`fov`、`width`、`height`、`bg`、`light` |
 | `bridge.ping` | 系统 | 连通性测试，返回 `pong` + 服务器时间 | 无专用子命令（`client.ping()` / `client.call("bridge.ping")` / 原始 TCP） | 无 |
 | `bridge.list_commands` | 系统 | 列出所有已注册命令 | `list`（`ls`） | 无 |
+
+### B. Terrain 程序化编辑命令（12 条，Unity 原生 TerrainData API）
+
+> **公共参数**：`terrain`(string, 可选) —— 目标 Terrain 的 GameObject 名称，省略时取场景中**第一个** Terrain；区域参数 `xBase`/`zBase`/`width`/`height`(int, 可选) —— 操作区域，省略时默认整图。
+
+| 命令 (bus name) | 类别 | 功能 | Python CLI | 关键参数 |
+|---|---|---|---|---|
+| `terrain.list` | 地形查询 | 列出场景中所有 Terrain（名称/位置/尺寸/各分辨率/层数/树数） | `terrain-list`（`tlist`） | `terrain` |
+| `terrain.get_heights` | 高度图 | 读取高度图区域，data 行优先 `index=y*width+x`，值 0~1 | `terrain-get-heights`（`tget`） | `terrain`、`xBase`、`zBase`、`width`、`height` |
+| `terrain.set_heights` | 高度图 | 写入高度图：`data`(float[] 行优先 0~1) **或** `noise=true` 用 Perlin 噪声生成（可复现） | `terrain-set-heights`（`tset`） | `terrain`、区域、`data` / `noise`、`noiseScale`、`noiseSeed`、`baseHeight`、`heightScale` |
+| `terrain.get_layers` | 纹理 | 列出 TerrainLayer（名称 + 漫反射贴图路径） | `terrain-get-layers`（`tlayer`） | `terrain` |
+| `terrain.get_alphamaps` | 纹理 | 读取纹理混合权重，data `index=(y*width+x)*layers+layer` | `terrain-get-alphamaps`（`tamap`） | `terrain`、区域 |
+| `terrain.set_alphamaps` | 纹理 | 写入纹理混合权重（**每像素自动归一化**到和为 1） | `terrain-set-alphamaps`（`tsamap`） | `terrain`、区域、`data`(float[]) |
+| `terrain.list_details` | 植被 | 列出草原型（DetailPrototype） | `terrain-list-details`（`tdlist`） | `terrain` |
+| `terrain.get_details` | 植被 | 读取某层植被密度图，data 行优先 `index=y*width+x` | `terrain-get-details`（`tdget`） | `terrain`、`layer`、区域 |
+| `terrain.set_details` | 植被 | 写入植被密度：`data`(int[] 行优先 0~16) **或** `random=true` + `count`/`seed`/`density` 随机撒点 | `terrain-set-details`（`tdset`） | `terrain`、`layer`、区域、`data` / `random`、`count`、`seed`、`density` |
+| `terrain.list_trees` | 树木 | 列出树原型与全部树实例（位置/缩放） | `terrain-list-trees`（`ttlist`） | `terrain` |
+| `terrain.add_trees` | 树木 | 添加树木：`positions`(float[] 每 3 个一组 {x,y,z} 归一化 0~1) **或** `random=true` + `count`/`seed`/`minScale`/`maxScale` 随机种植（自动贴地） | `terrain-add-trees`（`ttadd`） | `terrain`、`prototypeIndex`、`positions` / `random`、`count`、`seed`、`minScale`、`maxScale` |
+| `terrain.clear_trees` | 树木 | 清空 Terrain 上所有树实例 | `terrain-clear-trees`（`ttclear`） | `terrain` |
+
+**典型用法**：
+
+```bash
+# 查看场景中有哪些地形
+python -m unity_bridge terrain-list
+
+# 用噪声生成 64x64 区域的山丘（可复现）
+python -m unity_bridge terrain-set-heights --xBase 100 --zBase 100 \
+    --width 64 --height 64 --noise --noiseScale 0.02 --noiseSeed 42 \
+    --baseHeight 0.2 --heightScale 0.6
+
+# 读取指定区域高度并查看范围
+python -m unity_bridge terrain-get-heights --xBase 100 --zBase 100 --width 64 --height 64
+
+# 列出纹理层，然后写入混合权重（2 层：草地/岩石，按 x 渐变）
+python -m unity_bridge terrain-get-layers
+python -m unity_bridge terrain-set-alphamaps --width 16 --height 16 \
+    --data "1,0, 0.75,0.25, 0.5,0.5, 0.25,0.75, 0,1, ..."
+
+# 随机撒 200 棵草（第 0 个草原型）
+python -m unity_bridge terrain-set-details --layer 0 --random --count 200 --seed 7 --density 4
+
+# 随机种 50 棵树（第 0 个树原型）
+python -m unity_bridge terrain-add-trees --prototypeIndex 0 --random --count 50 --seed 7
+
+# 指定位置种一棵树（归一化坐标）
+python -m unity_bridge terrain-add-trees --prototypeIndex 0 --positions "0.25,0.5,0.25"
+
+# 清空树木
+python -m unity_bridge terrain-clear-trees
+```
+
+> **注意**：高度图 / 纹理 / 植被 / 树木的写入会立即应用到场景并标记 dirty（可保存）；修改后 Terrain 碰撞体会自动重建。所有命令均可用 `--json` 输出原始数据供程序化处理。
 
 ---
 
@@ -310,6 +365,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │       ├── SceneTreeCommand.cs     # 命令 scene.tree
 │       ├── MeshBoundsCommand.cs    # 命令 mesh.bounds（包围盒计算）
 │       ├── PrefabScreenshotCommand.cs  # 命令 prefab.screenshot（隔离复制+相机截图）
+│       ├── TerrainCommands.cs      # 命令 terrain.*（高度图/纹理/植被/树木，Unity 原生 TerrainData）
 │       └── SystemCommands.cs       # bridge.ping / bridge.list_commands
 └── python/                         # Python 侧（无需安装依赖）
     ├── unity_bridge/
