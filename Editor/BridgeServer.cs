@@ -99,35 +99,50 @@ namespace UnityPythonBridge
             using (var reader = new StreamReader(stream, new UTF8Encoding(false)))
             using (var writer = new StreamWriter(stream, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" })
             {
-                string line;
-                while (_running && (line = reader.ReadLine()) != null)
+                try
                 {
-                    if (string.IsNullOrWhiteSpace(line)) continue;
-
-                    var req = JsonUtility.FromJson<BridgeRequest>(line);
-                    if (req == null || string.IsNullOrEmpty(req.cmd))
+                    string line;
+                    while (_running && (line = reader.ReadLine()) != null)
                     {
-                        WriteError(writer, 0, "JSON 解析失败或缺少 cmd 字段");
-                        continue;
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+
+                        var req = JsonUtility.FromJson<BridgeRequest>(line);
+                        if (req == null || string.IsNullOrEmpty(req.cmd))
+                        {
+                            WriteError(writer, 0, "JSON 解析失败或缺少 cmd 字段");
+                            continue;
+                        }
+
+                        var id = req.id;
+                        var args = req.args ?? new BridgeArgs();
+
+                        // 关键：切到主线程执行，避免跨线程访问 Unity API
+                        MainThreadRunner.Enqueue(() =>
+                        {
+                            try
+                            {
+                                var data = BridgeDispatcher.Execute(req.cmd, args);
+                                var dataJson = data != null ? JsonUtility.ToJson(data) : "null";
+                                writer.WriteLine($"{{\"id\":{id},\"ok\":true,\"data\":{dataJson}}}");
+                            }
+                            catch (Exception e)
+                            {
+                                WriteError(writer, id, e.Message);
+                            }
+                        });
                     }
-
-                    var id = req.id;
-                    var args = req.args ?? new BridgeArgs();
-
-                    // 关键：切到主线程执行，避免跨线程访问 Unity API
-                    MainThreadRunner.Enqueue(() =>
-                    {
-                        try
-                        {
-                            var data = BridgeDispatcher.Execute(req.cmd, args);
-                            var dataJson = data != null ? JsonUtility.ToJson(data) : "null";
-                            writer.WriteLine($"{{\"id\":{id},\"ok\":true,\"data\":{dataJson}}}");
-                        }
-                        catch (Exception e)
-                        {
-                            WriteError(writer, id, e.Message);
-                        }
-                    });
+                }
+                catch (System.IO.IOException)
+                {
+                    // 客户端断开（如 Python 脚本被终止/超时）——正常现象，静默结束会话
+                }
+                catch (System.Net.Sockets.SocketException)
+                {
+                    // 远程主机强制关闭连接——正常现象，静默结束会话
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[UnityPythonBridge] 会话异常: {e.Message}");
                 }
             }
         }
