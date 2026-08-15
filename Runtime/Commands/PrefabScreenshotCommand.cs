@@ -100,9 +100,7 @@ namespace UnityPythonBridge.Commands
                 camGo.transform.position = camPos;
                 camGo.transform.LookAt(Isolation);
 
-                // 2.5) 补光：追加一盏与相机视线同向的平行光（light>0 时）
-                //      Unity 平行光光线方向 = -transform.forward，因此要让光线沿相机朝向
-                //      (从相机射向物体、永远照亮相机所见的正面)，light.forward 需指向相机背后。
+                // 2.5) 补光：追加一盏与相机朝向一致的平行光（light>0 时）
                 if (lightIntensity > 0)
                 {
                     lightGo = new GameObject("BridgeFillLight");
@@ -111,8 +109,8 @@ namespace UnityPythonBridge.Commands
                     fillLight.intensity = lightIntensity;
                     fillLight.color = Color.white;
                     fillLight.shadows = LightShadows.None;
-                    // 光线方向与相机视线完全一致：无论相机指向任何方向，物体正面都被照亮
-                    lightGo.transform.rotation = camGo.transform.rotation * Quaternion.Euler(0f, 180f, 0f);
+                    // 光线方向：light 的 rotation 与相机完全一致
+                    lightGo.transform.rotation = camGo.transform.rotation;
                     lightGo.transform.position = camPos;
                 }
 
