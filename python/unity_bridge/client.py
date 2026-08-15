@@ -111,10 +111,6 @@ class UnityClient:
         """在 Unity Console 打印一条 Error 日志。"""
         return self.call("debug.log_error", message=message)
 
-    def echo(self, message: str) -> dict:
-        """回显 message 与服务器时间（用于验证新命令是否已生效）。"""
-        return self.call("bridge.echo", message=message)
-
     def scene_tree(self, components: bool = False) -> dict:
         return self.call("scene.tree", components=components)
 
