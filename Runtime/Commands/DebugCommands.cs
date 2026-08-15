@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using UnityEngine;
 
 namespace UnityPythonBridge.Commands
@@ -57,3 +58,4 @@ namespace UnityPythonBridge.Commands
         public bool logged;
     }
 }
+#endif // UNITY_EDITOR

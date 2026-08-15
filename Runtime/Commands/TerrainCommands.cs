@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using UnityEditor;
@@ -865,3 +866,4 @@ namespace UnityPythonBridge.Commands
         }
     }
 }
+#endif // UNITY_EDITOR

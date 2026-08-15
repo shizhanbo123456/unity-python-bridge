@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 using System;
 using System.Globalization;
 using System.IO;
@@ -192,3 +193,4 @@ namespace UnityPythonBridge.Commands
         }
     }
 }
+#endif // UNITY_EDITOR
