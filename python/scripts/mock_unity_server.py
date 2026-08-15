@@ -51,7 +51,7 @@ COMMANDS = [
     {"name": "debug.log_error", "description": "在 Unity Console 打印一条 Error 日志。参数: message(string)"},
     {"name": "scene.tree", "description": "以树状结构返回当前场景中的物体层级。参数: components(bool)"},
     {"name": "mesh.bounds", "description": "计算 Assets 中网格/模型/预制体的轴对齐包围盒。参数: path(string)"},
-    {"name": "prefab.screenshot", "description": "将预制体复制到场景隔离位置并截图保存为 PNG。参数: path(string), offset{x,y,z}, output(string,.png), orthographic(bool), fov(number), width(int), height(int), bg(string)"},
+    {"name": "prefab.screenshot", "description": "将预制体复制到场景隔离位置并截图保存为 PNG（摄制后预制体副本/相机/补光保留在场景中）。参数: path(string), offset{x,y,z}, output(string,.png), orthographic(bool), fov(number), width(int), height(int), bg(string)"},
     {"name": "terrain.list", "description": "列出场景中所有 Terrain。参数: terrain(string,可选)"},
     {"name": "terrain.get_heights", "description": "读取高度图区域。参数: terrain, xBase, zBase, width, height"},
     {"name": "terrain.set_heights", "description": "写入高度图。参数: terrain, xBase, zBase, width, height, data(float[]) 或 noise/noiseScale/noiseSeed/baseHeight/heightScale"},
@@ -239,6 +239,10 @@ def mock_screenshot(args: dict) -> dict:
         "lookAt": iso,
         "fillLight": light if light > 0 else 0,
         "bytes": len(png),
+        "instanceName": path.rsplit("/", 1)[-1].replace(".prefab", ""),
+        "cameraName": "BridgeScreenshotCamera",
+        "lightName": "BridgeFillLight" if light > 0 else None,
+        "position": iso,
     }
 
 
