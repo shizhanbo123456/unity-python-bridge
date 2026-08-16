@@ -12,8 +12,7 @@ import json
 import socket
 from typing import Any, Optional
 
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 21927
+from .config import DEFAULT_HOST, DEFAULT_PORT, load_server_port
 
 
 class UnityBridgeError(Exception):
@@ -29,10 +28,10 @@ class UnityClient:
             data = client.call("scene.tree", components=True)
     """
 
-    def __init__(self, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT,
+    def __init__(self, host: str = None, port: int = None,
                  timeout: float = 10.0) -> None:
-        self.host = host
-        self.port = port
+        self.host = host or DEFAULT_HOST
+        self.port = port if port is not None else load_server_port()
         self.timeout = timeout
         self._sock: Optional[socket.socket] = None
         self._id = 0

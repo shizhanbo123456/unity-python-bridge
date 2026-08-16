@@ -55,7 +55,7 @@
 ### 1. Unity 侧（一次配置）
 
 1. 把本仓库整个文件夹（`unity-python-bridge/`）复制或 `git clone` 到 Unity 项目的 `Assets/` 下，即 `Assets/unity-python-bridge/`。
-2. 等待编译完成，用菜单 **Tools → Unity Python Bridge → Start Server** 启动服务器，看到日志提示监听 `127.0.0.1:21927` 即成功。
+2. 等待编译完成，用菜单 **Tools → Unity Python Bridge → Start Server** 启动服务器，看到日志提示监听 `127.0.0.1:21927`（或 bridge.ini 中 `[server] port` 配置的值）即成功。
    - Edit Mode 和 Play Mode 均可使用（命令在主线程执行）。
    - **BridgeManager 组件（可选）**：场景里新建空物体 → Add Component → 搜索 `Bridge Manager` 挂上，Inspector 会显示「启动/停止服务器」按钮，且**组件被销毁时自动停止服务器**。不挂组件也完全可用（菜单等效，服务器自驱命令队列）。
 
@@ -144,12 +144,16 @@ python -m unity_bridge reload --expect-version 1.2.0
 python -m unity_bridge reload --timeout 180 --interval 2
 ```
 
-> **配置文件 `bridge.ini`**：工具根目录下的 `bridge.ini` 存放运行时默认参数。目前支持：
+> **配置文件 `bridge.ini`**：工具根目录下的 `bridge.ini` 存放运行时默认参数，**Python CLI 与 Unity(C#) 两侧都直接读取它**（修改后无需重启，下次运行即生效）。目前支持：
 > ```ini
+> [server]
+> port = 21927        ; TCP 端口：C# 服务器据此监听，Python CLI 据此连接；--port 可临时覆盖
 > [reload]
-> timeout = 30   ; 等待 Unity 重编译恢复的超时（秒），命令行 --timeout 可临时覆盖
+> timeout = 30        ; 等待 Unity 重编译恢复的超时（秒）；--timeout 可临时覆盖
 > ```
-> 修改后无需重启，下次运行 `reload` 即生效；文件不存在或解析失败时回退到 30 秒。
+> - **Python 侧**：CLI 的 `--port` / `--timeout` 默认值分别来自 `[server] port` / `[reload] timeout`；底层 `UnityClient` 同样读取 ini，因此 `UnityClient()` 无参构造也使用 ini 端口。命令行显式传入时覆盖 ini。
+> - **C# 侧**：`BridgeServer.Start()` 在未按参数传入端口时，从 `<项目>/Assets/unity-python-bridge/bridge.ini` 读取 `[server] port` 作为监听端口。文件缺失、解析失败或值不在 1~65535 时回退到 `21927`。
+> - 文件不存在或解析失败时，端口回退到 `21927`、超时回退到 `30` 秒。
 
 > 原理：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `CompilationPipeline.RequestScriptCompilation()` 触发重编译；
 > 重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。

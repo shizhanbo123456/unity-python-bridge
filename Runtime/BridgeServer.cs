@@ -29,11 +29,62 @@ namespace UnityPythonBridge
         public static int Port { get; private set; } = DefaultPort;
         public static bool IsRunning => _running;
 
-        public static void Start(int port = DefaultPort)
+        /// <summary>从 bridge.ini 读取 [server] port。
+        /// ini 路径 = &lt;项目&gt;/Assets/unity-python-bridge/bridge.ini。
+        /// 文件缺失、解析失败或值无效（非 1~65535）时回退到 DefaultPort。</summary>
+        private static int ReadServerPortFromIni()
+        {
+            string iniPath = Path.Combine(Application.dataPath, "unity-python-bridge", "bridge.ini");
+            if (!File.Exists(iniPath))
+            {
+                return DefaultPort;
+            }
+            try
+            {
+                string currentSection = null;
+                foreach (var raw in File.ReadAllLines(iniPath))
+                {
+                    string line = raw.Trim();
+                    if (line.Length == 0 || line[0] == ';' || line[0] == '#') continue;
+                    if (line[0] == '[' && line[line.Length - 1] == ']')
+                    {
+                        currentSection = line.Substring(1, line.Length - 2).Trim();
+                        continue;
+                    }
+                    if (currentSection != "server") continue;
+                    int eq = line.IndexOf('=');
+                    if (eq < 0) continue;
+                    if (line.Substring(0, eq).Trim() != "port") continue;
+                    string value = line.Substring(eq + 1).Trim();
+                    // 去掉行内注释（; 或 # 之后），支持 `port = 21927  ; 注释` 写法
+                    int semicolon = value.IndexOf(';');
+                    int hashSign = value.IndexOf('#');
+                    int cut = semicolon >= 0 && (hashSign < 0 || semicolon < hashSign)
+                        ? semicolon
+                        : (hashSign >= 0 ? hashSign : -1);
+                    if (cut >= 0) value = value.Substring(0, cut).Trim();
+                    if (int.TryParse(value, out int p) && p > 0 && p <= 65535)
+                    {
+                        return p;
+                    }
+                    Debug.LogWarning($"[UnityPythonBridge] bridge.ini [server] port 无效: '{value}'，回退到默认端口 {DefaultPort}");
+                    return DefaultPort;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[UnityPythonBridge] 读取 bridge.ini 端口失败: {e.Message}，回退到默认端口 {DefaultPort}");
+            }
+            return DefaultPort;
+        }
+
+        /// <summary>启动服务器。port 为 null 时从 bridge.ini 的 [server] port 读取；
+        /// 读不到或无效则回退到 DefaultPort（21927）。</summary>
+        public static void Start(int? port = null)
         {
             if (_running) return;
 
-            Port = port;
+            Port = port ?? ReadServerPortFromIni();
             _running = true;
             _listenThread = new Thread(ListenLoop)
             {

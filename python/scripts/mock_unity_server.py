@@ -10,8 +10,16 @@ import json
 import os
 import socket
 import struct
+import sys
 import threading
 import zlib
+
+# 端口默认值与 CLI 保持一致：优先从 bridge.ini 的 [server] port 读取，缺失回退 21927
+try:
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from unity_bridge.config import load_server_port
+except Exception:
+    load_server_port = lambda: 21927
 
 # 模拟 Unity 场景树（与 C# SceneTreeCommand 返回结构一致）
 MOCK_SCENE = {
@@ -544,7 +552,7 @@ def mock_clear_trees() -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Mock Unity Bridge 服务器")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=21927)
+    parser.add_argument("--port", type=int, default=load_server_port())
     args = parser.parse_args()
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -15,34 +15,14 @@
 from __future__ import annotations
 
 import argparse
-import configparser
 import json
 import sys
 import time
-from pathlib import Path
 from typing import List, Optional
 
-from .client import DEFAULT_HOST, DEFAULT_PORT, UnityBridgeError, UnityClient
-
-
-# 工具根目录：cli.py 位于 <root>/python/unity_bridge/cli.py
-_BRIDGE_ROOT = Path(__file__).resolve().parents[2]
-_INI_PATH = _BRIDGE_ROOT / "bridge.ini"
-
-
-def load_reload_timeout(default: float = 30.0) -> float:
-    """读取 bridge.ini 中 [reload] timeout，作为 reload 等待超时的默认值。
-
-    文件缺失或解析失败时回退到 default（30 秒）。命令行 --timeout 仍会覆盖此值。
-    """
-    parser = configparser.ConfigParser()
-    try:
-        if parser.read(_INI_PATH, encoding="utf-8"):
-            if parser.has_option("reload", "timeout"):
-                return float(parser.get("reload", "timeout"))
-    except (configparser.Error, ValueError, OSError):
-        pass
-    return default
+from .client import UnityBridgeError, UnityClient
+from .config import (DEFAULT_HOST, DEFAULT_PORT, load_reload_timeout,
+                     load_server_port)
 
 
 # 树形绘制字符
@@ -515,7 +495,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="通过 Python 命令行操控 Unity Editor（TCP/JSON 协议，Unity 原生 JsonUtility）",
     )
     parser.add_argument("--host", default=DEFAULT_HOST, help=f"Unity 地址（默认 {DEFAULT_HOST}）")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT, help=f"Unity 端口（默认 {DEFAULT_PORT}）")
+    parser.add_argument("--port", type=int, default=load_server_port(),
+                        help=f"Unity 端口（默认读取 bridge.ini 的 [server] port，默认 {DEFAULT_PORT}）")
     parser.add_argument("--timeout", type=float, default=10.0, help="连接/响应超时秒数（默认 10）")
 
     sub = parser.add_subparsers(dest="command", required=True)
