@@ -133,7 +133,8 @@ python -m unity_bridge tree --components
 **触发重编译并等待恢复**：
 
 ```bash
-# 触发 Unity 脚本重编译，每 1 秒轮询 bridge.version，直到服务器恢复或超时（默认 120s）
+# 触发 Unity 脚本重编译，每 1 秒轮询 bridge.version，直到服务器恢复或超时
+# 等待超时默认读取 bridge.ini 的 [reload] timeout（默认 30 秒），可用 --timeout 覆盖
 python -m unity_bridge reload
 
 # 指定期望版本（不匹配则继续等待）
@@ -142,6 +143,13 @@ python -m unity_bridge reload --expect-version 1.2.0
 # 自定义超时与轮询间隔
 python -m unity_bridge reload --timeout 180 --interval 2
 ```
+
+> **配置文件 `bridge.ini`**：工具根目录下的 `bridge.ini` 存放运行时默认参数。目前支持：
+> ```ini
+> [reload]
+> timeout = 30   ; 等待 Unity 重编译恢复的超时（秒），命令行 --timeout 可临时覆盖
+> ```
+> 修改后无需重启，下次运行 `reload` 即生效；文件不存在或解析失败时回退到 30 秒。
 
 > 原理：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `CompilationPipeline.RequestScriptCompilation()` 触发重编译；
 > 重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。
