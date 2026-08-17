@@ -4,6 +4,8 @@
 
 **纯 Unity 原生实现**：C# 侧仅使用 Unity 内置 `JsonUtility`（无 Newtonsoft.Json），Python 侧仅使用标准库——**克隆/复制整个仓库文件夹到任意项目的 `Assets/` 下即可使用**，无需安装任何包。
 
+> 📖 **完整命令列表见 [`COMMANDS.md`](COMMANDS.md)**（34 条，按功能分类：系统 / 调试 / 相机截图 / 场景 / 网格 / 物体 / 地形；含全部参数与示例）。本 README 只讲架构、连接、配置与用法。
+
 ---
 
 ## 一、架构总览
@@ -29,9 +31,7 @@
 │                             │          │  └──────────┬──────────────────┘  │
 │                             │          │             │                     │
 │                             │          │  ┌──────────▼──────────────────┐  │
-│                             │          │  │ Commands/                   │  │
-│                             │          │  │  SceneTreeCommand           │  │
-│                             │          │  │  SystemCommands             │  │
+│                             │          │  │ Commands/ (各命令实现)       │  │
 │                             │          │  └─────────────────────────────┘  │
 └─────────────────────────────┘          └───────────────────────────────────┘
 ```
@@ -58,46 +58,26 @@
 2. 等待编译完成，用菜单 **Tools → Unity Python Bridge → Start Server** 启动服务器，看到日志提示监听 `127.0.0.1:21927`（或 bridge.ini 中 `[server] port` 配置的值）即成功。
    - Edit Mode 和 Play Mode 均可使用（命令在主线程执行）。
    - **BridgeManager 组件（可选）**：场景里新建空物体 → Add Component → 搜索 `Bridge Manager` 挂上，Inspector 会显示「启动/停止服务器」按钮，且**组件被销毁时自动停止服务器**。不挂组件也完全可用（菜单等效，服务器自驱命令队列）。
+   - 重复点击「启动」/「停止」不会静默：已运行时再启动、未运行时再停止，会打印 Warning 提示。
 
-> **重编译自动恢复**：服务器状态会持久化到 `Library/BridgeServerState.txt`——**触发脚本重编译或重新打开项目后，自动按该状态恢复**（无需手动重启）。
-> 菜单 Start/Stop 与组件按钮均会同步写入该状态。也可用 `python -m unity_bridge reload` 命令行触发重编译并自动等待恢复（见「命令总览」）。
+> **重编译自动恢复**：服务器状态持久化到 `Library/BridgeServerState.txt`——**触发脚本重编译或重新打开项目后，自动按该状态恢复**（无需手动重启）。菜单 Start/Stop 与组件按钮均会同步写入该状态。
 
 ### 2. Python 侧
 
 ```bash
 cd python
 
-# 打印当前场景物体层级树（第一个命令功能）
-python -m unity_bridge tree
-
-# 附带显示每个物体的组件类型
-python -m unity_bridge tree --components
-
-# 输出原始 JSON（供程序化处理）
-python -m unity_bridge tree --json
-
-# 查看 Unity 侧所有可用命令
+# 查看可用命令（完整参考见 COMMANDS.md）
 python -m unity_bridge list
 
-# 计算 Assets 中网格/模型/预制体的轴对齐包围盒
-python -m unity_bridge mesh-bounds Assets/Models/Rock.fbx
+# 打印当前场景物体层级树
+python -m unity_bridge tree
+python -m unity_bridge tree --components      # 附带组件类型
+python -m unity_bridge tree --json            # 原始 JSON
 
-# 预制体同样支持；bounds 为 mesh-bounds 的别名，--json 输出原始数据
+# 计算包围盒 / 隔离渲染预制体截图（完整参数见 COMMANDS.md）
 python -m unity_bridge bounds Assets/Prefabs/Tree.prefab --json
-
-# 将预制体复制到场景隔离位置并截图保存为 PNG
-#   path/output 为位置参数；--offset 为相机相对预制体的位置（必填，格式 "x,y,z"；camPos 缺省时使用）
-python -m unity_bridge screenshot Assets/Prefabs/Tree.prefab out/tree.png --offset "3,2,5"
-
-# 直接指定相机位置与观察目标（世界坐标；也可 --relative 改为相对预制体位置）
-python -m unity_bridge screenshot Assets/Prefabs/Tree.prefab out/tree.png \
-    --offset "0,0,0" --camPos "5,3,8" --lookAt "0,0,0"
-python -m unity_bridge screenshot Assets/Prefabs/Rock.fbx out/rock.png \
-    --offset "0,0,0" --camPos "0,2,5" --lookAt "0,1,0" --relative
-
-# 正交相机 + 指定视野/分辨率/背景色；shot 为 screenshot 的别名
-python -m unity_bridge shot Assets/Prefabs/Rock.fbx out/rock.png --offset "0,0,-8" \
-    --orthographic --fov 3 --width 1280 --height 720 --bg "0.2,0.2,0.2,1"
+python -m unity_bridge shot Assets/Prefabs/Tree.prefab out/tree.png --offset "3,2,5"
 ```
 
 ### 3. 无 Unity 环境联调（可选）
@@ -106,311 +86,94 @@ python -m unity_bridge shot Assets/Prefabs/Rock.fbx out/rock.png --offset "0,0,-
 # 终端 A：启动模拟服务器（复刻 Unity 侧协议）
 python scripts/mock_unity_server.py
 
-# 终端 B：正常使用 CLI
+# 终端 B：正常使用 CLI（所有命令可用，截图会落占位 PNG）
 python -m unity_bridge tree --components
 ```
 
 ---
 
-## 三、命令总览（34 条：7 基础 + 5 调试 + 19 Terrain + 1 视图 + 2 物体）
+## 三、连接与配置
 
-### A. 基础命令（7 条）
-
-| 命令 (bus name) | 类别 | 功能 | Python CLI | 关键参数 |
-|---|---|---|---|---|
-| `scene.tree` | 场景读取 | 树状返回当前激活场景的物体层级 | `tree` | `components`(bool, 可选，显组件类型) |
-| `mesh.bounds` | 资源查询 | 计算 Assets 中 mesh / 模型 / prefab 的轴对齐包围盒（AABB，多网格合并） | `mesh-bounds`（`bounds`） | `path`(string, Assets 相对路径) |
-| `prefab.screenshot` | 资源查询 | 隔离复制 prefab 到 `(9999,9999,9999)` + 相机环绕 `LookAt` 渲染存 PNG（**旋转保持资产原有**；支持正交/透视、`fov`、`bg`、补光；可**直接指定相机位置与观察目标**，世界坐标或相对预制体） | `screenshot`（`shot`） | `path`、`output`(.png)、`offset`("x,y,z")、`camPos`("x,y,z")、`lookAt`("x,y,z")、`relative`、`orthographic`、`fov`、`width`、`height`、`bg`、`light` |
-| `bridge.ping` | 系统 | 连通性测试，返回 `pong` + 服务器时间 | 无专用子命令（`client.ping()` / `client.call("bridge.ping")` / 原始 TCP） | 无 |
-| `bridge.list_commands` | 系统 | 列出所有已注册命令 | `list`（`ls`） | 无 |
-| `bridge.version` | 系统 | 返回桥接层版本号与命令统计，确认 Unity 侧代码是否为最新 | `version`（`ver`/`v`） | 无 |
-| `bridge.reload` | 系统 | 触发 Unity 脚本重编译（domain reload），编译完成后服务器自动恢复 | `reload`（`rl`） | `--expect-version`、`--timeout`、`--interval` |
-
-### A2. 调试命令（5 条）
-
-| 命令 (bus name) | 功能 | Python CLI | 关键参数 |
-|---|---|---|---|
-| `debug.log` | 在 Unity Console 打印一条 Info 日志 | `debug-log`（`dlog`） | `message` |
-| `debug.log_warning` | 在 Unity Console 打印一条 Warning 日志 | `debug-log-warning`（`dlogw`） | `message` |
-| `debug.log_error` | 在 Unity Console 打印一条 Error 日志 | `debug-log-error`（`dloge`） | `message` |
-| `debug.get_logs` | 读取最近 N 条 Console 日志（自订阅时刻起的环形缓冲，上限 500，可按类型过滤） | `debug-logs`（`dlogs`） | `--count`（默认 50）、`--type`（all/log/warning/error/exception） |
-| `debug.log_version` | 在 Unity Console 打印桥接层版本号（含命令总数） | `debug-log-version`（`dlogv`） | 无 |
-
-### A3. 视图与物体操作命令（3 条）
-
-| 命令 (bus name) | 功能 | Python CLI | 关键参数 |
-|---|---|---|---|
-| `view.camera` | 渲染**指定相机的实时画面**保存为 PNG（默认 MainCamera） | `view-screenshot`（`vshot`） | `output`(.png)、`camera`(可选，默认 MainCamera)、`width`、`height`(可选，默认相机当前分辨率) |
-| `gameobject.get` | 读取 GameObject 的 active 状态与 Transform 的 position/rotation/scale | `gameobject-get`（`gget`） | `target`(路径优先/名称兼容)、`quaternion`(可选) |
-| `gameobject.set` | 写入 active / position / rotation / scale（支持 Undo） | `gameobject-set`（`gset`） | `target`、`active`(-1 不改/0 隐藏/1 激活)、`position`、`rotation`、`scale`、`quaternion` |
-
-> **view.\* 命名约定**：`view.camera` 抓取**场景中已有相机的实时渲染**；未来会新增
-> `view.window`（截取 Unity 界面 Scene/Game 窗口的**最终呈现**，含 UI/叠加层）。二者与
-> `prefab.screenshot`（隔离渲染单个资产）职责互不重叠，新截图类功能请归入 `view.*` 命名空间。
-
-**view.camera 示例**：
+### 3.1 连接参数（Python 侧）
 
 ```bash
-# 默认相机（依次找 tag=MainCamera / 名为 Main Camera 的 / 第一个激活相机）
-python -m unity_bridge view-screenshot out/gameview.png
-
-# 指定相机与分辨率
-python -m unity_bridge vshot out/ui.png --camera "UICamera" --width 1280 --height 720
+python -m unity_bridge --host 127.0.0.1 --port 21927 --timeout 10 tree
 ```
 
-**gameobject 示例**：
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `--host` | `127.0.0.1` | Unity 地址（服务器只绑本机） |
+| `--port` | 读 `bridge.ini` 的 `[server] port`（默认 21927） | **显式传入时覆盖 ini** |
+| `--timeout` | 连接/响应超时 10 秒；`reload` 子命令另有总超时（读 ini，默认 30s，可 `--timeout` 覆盖） | 网络超时 |
 
-```bash
-# 读取物体状态（路径定位；名称唯一时也可直接传名称）
-python -m unity_bridge gameobject-get "Player/Body/LeftArm"
-python -m unity_bridge gget "Player" --quaternion        # 附带输出四元数
+> ⚠️ **全局参数必须放在子命令前面**（如 `python -m unity_bridge --port 21950 version`），放后面会报 `unrecognized arguments`。
 
-# 写入：隐藏物体 + 改世界坐标/欧拉角/本地缩放（支持 Undo）
-python -m unity_bridge gameobject-set "Player" --active 0 --position "1,2,3" --rotation "0,90,0" --scale "2,2,2"
+底层 `UnityClient()` 无参构造也读取 ini 端口，因此直接当库用同样生效：
 
-# 用四元数写入旋转
-python -m unity_bridge gset "Player/Body" --rotation "0,0.7071,0,0.7071" --quaternion
+```python
+from unity_bridge import UnityClient
+with UnityClient() as c:            # 自动使用 bridge.ini 端口
+    print(c.call("bridge.version"))
 ```
 
-> **定位规则**：`target` 优先按层级路径（`Player/Body`，从场景根开始，'/' 分隔，重名可区分）；
-> 传单个名称时场景中唯一则命中，多个同名会报错并提示可用路径。
-> **坐标约定**：`position`=世界坐标；`rotation` 默认世界欧拉角、`quaternion=true` 时用四元数
-> （读与写一致）；`scale`=localScale（世界缩放只读，写入只能走本地缩放）。
+### 3.2 配置文件 `bridge.ini`（Python 与 C# 两侧都读取）
 
-> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询，或用 `debug-log-version` 在 Console 打印。当前版本 **v1.8.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具 / v1.3.0=新增 terrain stash 四命令、view.camera、gameobject.get/set / v1.4.0=新增 debug.get_logs 读取 Console 日志 / v1.5.0=新增 debug.log_version 打印版本号 / v1.6.0=版本号维护 / v1.7.0=服务器重复启动/停止打印 Warning / v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标；reload、Flush 驱动等改动保持原版本号）。
+位于工具根目录，**修改后无需重启，下次运行即生效**：
 
-**触发重编译并等待恢复**：
+```ini
+[server]
+port = 21927        ; TCP 端口：C# 服务器据此监听，Python CLI 据此连接；--port 可临时覆盖
+[reload]
+timeout = 30        ; 等待 Unity 重编译恢复的超时（秒）；--timeout 可临时覆盖
+```
+
+- **Python 侧**：CLI 的 `--port` / `reload --timeout` 默认值分别来自 `[server] port` / `[reload] timeout`；底层 `UnityClient` 同样读取 ini。
+- **C# 侧**：`BridgeServer.Start()` 未按参数传端口时，从 `<项目>/Assets/unity-python-bridge/bridge.ini` 读取 `[server] port` 作为监听端口。
+- 支持行内注释（`;` 或 `#` 之后的内容被忽略）；文件缺失、解析失败或值无效时，端口回退 `21927`、超时回退 `30` 秒。
+- 若重命名工具文件夹（非 `unity-python-bridge`），C# 读不到 ini 端口时会自动回退默认端口（行为不退化）。
+
+### 3.3 服务器生命周期
+
+- **启动**：菜单 **Tools → Unity Python Bridge → Start Server**，或场景 BridgeManager 组件按钮。
+- **停止**：菜单 **Tools → Unity Python Bridge → Stop Server**，或组件按钮；销毁挂有 BridgeManager 的物体也会自动停服。
+- **重复操作提示**：已在运行时再「启动」→ Warning「服务器已在运行中…」；未运行时再「停止」→ Warning「服务器未在运行…」。
+- **自动恢复**：状态写入 `Library/BridgeServerState.txt`，脚本重编译 / 重开项目后自动按状态恢复。
+
+### 3.4 触发重编译（`bridge.reload`）
 
 ```bash
-# 触发 Unity 脚本重编译，每 1 秒轮询 bridge.version，直到服务器恢复或超时
-# 等待超时默认读取 bridge.ini 的 [reload] timeout（默认 30 秒），可用 --timeout 覆盖
+# 触发 Unity 脚本重编译，轮询 bridge.version 直到服务器恢复或超时
 python -m unity_bridge reload
 
-# 指定期望版本（不匹配则继续等待）
-python -m unity_bridge reload --expect-version 1.2.0
-
-# 自定义超时与轮询间隔
-python -m unity_bridge reload --timeout 180 --interval 2
+# 指定期望版本（不匹配则继续等待）、自定义超时与轮询间隔
+python -m unity_bridge reload --expect-version 1.8.0 --timeout 180 --interval 2
 ```
 
-> **配置文件 `bridge.ini`**：工具根目录下的 `bridge.ini` 存放运行时默认参数，**Python CLI 与 Unity(C#) 两侧都直接读取它**（修改后无需重启，下次运行即生效）。目前支持：
-> ```ini
-> [server]
-> port = 21927        ; TCP 端口：C# 服务器据此监听，Python CLI 据此连接；--port 可临时覆盖
-> [reload]
-> timeout = 30        ; 等待 Unity 重编译恢复的超时（秒）；--timeout 可临时覆盖
-> ```
-> - **Python 侧**：CLI 的 `--port` / `--timeout` 默认值分别来自 `[server] port` / `[reload] timeout`；底层 `UnityClient` 同样读取 ini，因此 `UnityClient()` 无参构造也使用 ini 端口。命令行显式传入时覆盖 ini。
-> - **C# 侧**：`BridgeServer.Start()` 在未按参数传入端口时，从 `<项目>/Assets/unity-python-bridge/bridge.ini` 读取 `[server] port` 作为监听端口。文件缺失、解析失败或值不在 1~65535 时回退到 `21927`。
-> - 文件不存在或解析失败时，端口回退到 `21927`、超时回退到 `30` 秒。
-
-> 原理：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `CompilationPipeline.RequestScriptCompilation()` 触发重编译；
-> 重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。
-> 注意：**Unity 失焦/后台时 `EditorApplication.update` 不运行，重编译不会自动触发**——执行 `reload` 前请让 Unity 窗口保持在前台。
-
-### B. Terrain 程序化编辑命令（19 条：15 程序化编辑 + 4 stash 快照，Unity 原生 TerrainData API）
-
-> **公共参数**：`terrain`(string, 可选) —— 目标 Terrain 的 GameObject 名称，省略时取场景中**第一个** Terrain；区域参数 `xBase`/`zBase`/`width`/`height`(int, 可选) —— 操作区域，省略时默认整图。
-
-| 命令 (bus name) | 类别 | 功能 | Python CLI | 关键参数 |
-|---|---|---|---|---|
-| `terrain.list` | 地形查询 | 列出场景中所有 Terrain（名称/位置/尺寸/各分辨率/层数/树数） | `terrain-list`（`tlist`） | `terrain` |
-| `terrain.get_heights` | 高度图 | 读取高度图区域，data 行优先 `index=y*width+x`，值 0~1 | `terrain-get-heights`（`tget`） | `terrain`、`xBase`、`zBase`、`width`、`height` |
-| `terrain.set_heights` | 高度图 | 写入高度图：`data`(float[] 行优先 0~1) **或** `noise=true` 用 Perlin 噪声生成（可复现） | `terrain-set-heights`（`tset`） | `terrain`、区域、`data` / `noise`、`noiseScale`、`noiseSeed`、`baseHeight`、`heightScale` |
-| `terrain.get_layers` | 纹理 | 列出 TerrainLayer（名称 + 漫反射贴图路径） | `terrain-get-layers`（`tlayer`） | `terrain` |
-| `terrain.get_diffuse_dirs` | 纹理 | 返回所有 TerrainLayer 的 Diffuse 贴图**目录（去重）**及每层完整路径（layers 数组 1:1 对应原始索引，不去重） | `terrain-get-diffuse-dirs`（`tdiff`） | `terrain` |
-| `terrain.get_tree_prefab_dirs` | 树木 | 返回所有树原型（TreePrototype）的 Prefab **目录（去重）**及完整路径（trees 数组 1:1 对应原始索引） | `terrain-get-tree-prefab-dirs`（`ttpd`） | `terrain` |
-| `terrain.get_detail_asset_dirs` | 植被 | 返回所有草原型（DetailPrototype）的**预制体或贴图**目录（去重）及完整路径，自动区分类型 | `terrain-get-detail-asset-dirs`（`tdad`） | `terrain` |
-| `terrain.get_alphamaps` | 纹理 | 读取纹理混合权重，data `index=(y*width+x)*layers+layer` | `terrain-get-alphamaps`（`tamap`） | `terrain`、区域 |
-| `terrain.set_alphamaps` | 纹理 | 写入纹理混合权重（**每像素自动归一化**到和为 1） | `terrain-set-alphamaps`（`tsamap`） | `terrain`、区域、`data`(float[]) |
-| `terrain.list_details` | 植被 | 列出草原型（DetailPrototype） | `terrain-list-details`（`tdlist`） | `terrain` |
-| `terrain.get_details` | 植被 | 读取某层植被密度图，data 行优先 `index=y*width+x` | `terrain-get-details`（`tdget`） | `terrain`、`layer`、区域 |
-| `terrain.set_details` | 植被 | 写入植被密度：`data`(int[] 行优先 0~16) **或** `random=true` + `count`/`seed`/`density` 随机撒点 | `terrain-set-details`（`tdset`） | `terrain`、`layer`、区域、`data` / `random`、`count`、`seed`、`density` |
-| `terrain.list_trees` | 树木 | 列出树原型与全部树实例（位置/缩放） | `terrain-list-trees`（`ttlist`） | `terrain` |
-| `terrain.add_trees` | 树木 | 添加树木：`positions`(float[] 每 3 个一组 {x,y,z} 归一化 0~1) **或** `random=true` + `count`/`seed`/`minScale`/`maxScale` 随机种植（自动贴地） | `terrain-add-trees`（`ttadd`） | `terrain`、`prototypeIndex`、`positions` / `random`、`count`、`seed`、`minScale`、`maxScale` |
-| `terrain.clear_trees` | 树木 | 清空 Terrain 上所有树实例 | `terrain-clear-trees`（`ttclear`） | `terrain` |
-| `terrain.stash` | stash | 把当前地形的**树木实例 / 植被密度图全量**序列化为 JSON 存到工具 stash 子目录（**同名报错，不允许覆盖**） | `terrain-stash`（`tstash`） | `terrain`、`type`(trees/details/all，默认 all)、`name`(必填，不含扩展名) |
-| `terrain.apply_stash` | stash | 读取 stash JSON 并**整体写回地形**（替换当前 trees/detail，原型数/分辨率不匹配会拒绝） | `terrain-apply-stash`（`tapply`） | `terrain`、`type`(默认 all)、`name`(必填) |
-| `terrain.stash_delete` | stash | 删除指定 stash 文件 | `terrain-stash-delete`（`tstashdel`） | `type`(必填 trees/details)、`name`(必填) |
-| `terrain.stash_list` | stash | 列出工具 stash 子目录下所有 stash 文件 | `terrain-stash-list`（`tstashlist`） | `type`(可选，默认 all) |
-
-**典型用法**：
-
-```bash
-# 查看场景中有哪些地形
-python -m unity_bridge terrain-list
-
-# 用噪声生成 64x64 区域的山丘（可复现）
-python -m unity_bridge terrain-set-heights --xBase 100 --zBase 100 \
-    --width 64 --height 64 --noise --noiseScale 0.02 --noiseSeed 42 \
-    --baseHeight 0.2 --heightScale 0.6
-
-# 读取指定区域高度并查看范围
-python -m unity_bridge terrain-get-heights --xBase 100 --zBase 100 --width 64 --height 64
-
-# 列出纹理层，然后写入混合权重（2 层：草地/岩石，按 x 渐变）
-python -m unity_bridge terrain-get-layers
-python -m unity_bridge terrain-set-alphamaps --width 16 --height 16 \
-    --data "1,0, 0.75,0.25, 0.5,0.5, 0.25,0.75, 0,1, ..."
-
-# 随机撒 200 棵草（第 0 个草原型）
-python -m unity_bridge terrain-set-details --layer 0 --random --count 200 --seed 7 --density 4
-
-# 随机种 50 棵树（第 0 个树原型）
-python -m unity_bridge terrain-add-trees --prototypeIndex 0 --random --count 50 --seed 7
-
-# 指定位置种一棵树（归一化坐标）
-python -m unity_bridge terrain-add-trees --prototypeIndex 0 --positions "0.25,0.5,0.25"
-
-# 清空树木
-python -m unity_bridge terrain-clear-trees
-```
-
-**Stash 快照链路**（stash → clear → 截图看干净地形 → apply 恢复，配合 view.camera / screenshot 做截图调整）：
-
-```bash
-# 1) 把当前地形快照存为 JSON（存到 <Assets>/unity-python-bridge/stash/{trees|details}/<name>.json）
-python -m unity_bridge terrain-stash --name forest_v1 --type all
-python -m unity_bridge terrain-stash --name forest_v1 --type trees     # 只存树木
-
-# 2) 同名保存会直接报错（不允许覆盖），需先删除：
-python -m unity_bridge terrain-stash-delete --type trees --name forest_v1
-
-# 3) 查看已有 stash
-python -m unity_bridge terrain-stash-list
-
-# 4) 清空植被 → 观察/截图干净地形
-python -m unity_bridge terrain-clear-trees
-python -m unity_bridge terrain-set-details --layer 0 --data "0,..."    # 或手动清 detail
-python -m unity_bridge view-screenshot out/clean.png
-
-# 5) 恢复快照（整体替换，trees 自动贴地）
-python -m unity_bridge terrain-apply-stash --name forest_v1 --type all
-python -m unity_bridge view-screenshot out/restored.png
-```
-
-> **stash 存储说明**：文件为 UTF-8 JSON 文本，存放在工具根目录下 `stash/trees/` 与 `stash/details/`
-> 两个子目录（按类分组），**可进 git、可被 Python 直接读取**。`type=all` 时会写入两个文件。
-> 应用时校验树原型数 / 草原型数 / detail 分辨率，与当前地形不一致会拒绝应用（避免错位）。
-
-> **注意**：高度图 / 纹理 / 植被 / 树木的写入会立即应用到场景并标记 dirty（可保存）；修改后 Terrain 碰撞体会自动重建。所有命令均可用 `--json` 输出原始数据供程序化处理。
+- **原理**：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `CompilationPipeline.RequestScriptCompilation()` 触发重编译；重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。
+- ⚠️ **Unity 失焦/后台时 `EditorApplication.update` 不运行，重编译不会自动触发**——执行 `reload` 前请让 Unity 窗口保持在前台。
+- ⚠️ **Unity 编辑器忽略一切软件注入的鼠标输入**（模拟点击无法替代前台激活）；`reload` 是进程内 API，不受此限制，是自动化编译的正路。
 
 ---
 
-## 四、树状输出示例
+## 四、命令列表
 
-```
-Scene: DemoScene  (3 个根物体)
-Main Camera  [Transform, Camera, AudioListener]
-Directional Light  [Transform, Light]
-Player  [Transform, CharacterController, PlayerController]
-├── Body  [Transform, Animator]
-│   ├── LeftArm  [Transform]
-│   └── RightArm  [Transform]
-└── Head  [Transform, SkinnedMeshRenderer]
-    └── Hat (inactive)  [Transform]
-```
+**完整命令列表（34 条，按功能分类：系统 4 / 调试 5 / 相机截图 2 / 场景 1 / 网格 1 / 物体 2 / 地形 19）见 [`COMMANDS.md`](COMMANDS.md)**，含：服务端命令名、Python CLI 与别名、全部参数、常用工作流示例。
 
----
+快速导航：
 
-## 五、mesh.bounds 命令（计算包围盒）
-
-计算 Assets 中**网格 / 模型 / 预制体**的轴对齐包围盒（AABB）。C# 侧使用
-`AssetDatabase` 加载资源、`mesh.bounds` / `renderer.bounds` 计算，结果返回三个轴
-的坐标范围，形如 `x:-2~6, y:-0.5~2, z:1~6`。
-
-**参数**：`path`（string）—— 目标在 Assets 中的相对路径。可带或不带 `Assets/` 前缀；
-支持 `.mesh`（网格）、`.fbx`/`.obj`/`.blend` 等（模型）、`.prefab`（预制体）。
-
-**多网格处理**：若 fbx 模型或 prefab 内含多个网格，命令会实例化到原点（根变换重置为
-identity，取几何固有范围），合并其下所有 `MeshRenderer` 与 `SkinnedMeshRenderer` 的包围盒，
-返回能包围所有网格的合并包围盒。
-
-**返回结构**：
-
-```json
-{
-  "path": "Assets/Models/Rock.fbx",
-  "resolvedPath": "Assets/Models/Rock.fbx",
-  "type": "model",
-  "min":  { "x": -2, "y": -0.5, "z": 1 },
-  "max":  { "x": 6,  "y": 2,   "z": 6 },
-  "center": { "x": 2, "y": 0.75, "z": 3.5 },
-  "size": { "x": 8, "y": 2.5, "z": 5 },
-  "format": "x:-2~6, y:-0.5~2, z:1~6"
-}
-```
-
-**命令行**：
-
-```bash
-python -m unity_bridge mesh-bounds Assets/Models/Rock.fbx
-# 文本输出：
-#   path  : Assets/Models/Rock.fbx
-#   type  : model
-#   bounds: x:-2~6, y:-0.5~2, z:1~6
-#     min : (-2, -0.5, 1)
-#     max : (6, 2, 6)
-#     size: (8, 2.5, 5)
-
-python -m unity_bridge bounds Assets/Prefabs/Tree.prefab --json   # bounds 为 mesh-bounds 的别名
-```
-
-> 提示：`format` 字段即 `x:min~max, y:..., z:...` 可读格式；`min/max/center/size`
-> 为机器可解析的数值，方便后续地形拼接计算。
+| 类别 | 说明 | 代表命令 |
+|---|---|---|
+| 系统与连通 | 连通测试 / 列命令 / 版本 / 触发重编译 | `bridge.ping` `bridge.reload` |
+| 调试与日志 | 打日志、读回日志、打印版本 | `debug.get_logs` `debug.log_version` |
+| 相机与截图 | 隔离渲染资产、抓相机实时画面 | `prefab.screenshot` `view.camera` |
+| 场景层级 | 场景物体树 | `scene.tree` |
+| 网格与资源 | 包围盒 | `mesh.bounds` |
+| 物体操作 | 读写 active/transform | `gameobject.get/set` |
+| 地形编辑 | 高度/纹理/植被/树木/快照/资源目录 | `terrain.*`（19 条） |
 
 ---
 
-## 六、prefab.screenshot 命令（预制体截图）
-
-将目标预制体**复制到当前场景的隔离位置 `(9999,9999,9999)`**（远离原点，避免与场景中已有
-物体重叠/碰撞），创建一台相机移动到相对预制体的位置并 `LookAt` 看向它，渲染后保存为 PNG，
-**最后销毁临时复制的预制体与创建的相机**，不污染场景。
-复制出的预制体**旋转保持资产原有的**（不强制 identity），缩放统一为 1。
-
-**参数**：
-
-| 参数 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| `path` | string | ✅ | 预制体（或模型文件）在 Assets 中的相对路径 |
-| `offset` | Vector3 | ✅ | 相机**相对预制体位置**的偏移，格式 `{x,y,z}` / `[x,y,z]` / `"x,y,z"` |
-| `output` | string | ✅ | PNG 输出路径，**必须以 `.png` 结尾**（父目录会自动创建） |
-| `orthographic` | bool | ❌ | 是否正交相机，默认 `false`（透视） |
-| `fov` | number | ❌ | 视野：透视时=`fieldOfView`，正交时=`orthographicSize`；**默认使用 Unity 默认大小** |
-| `width` | int | ❌ | 输出图片宽，默认 `1920` |
-| `height` | int | ❌ | 输出图片高，默认 `1080` |
-| `bg` | string | ❌ | 背景色 `"r,g,b[,a]"`（分量 0~1），默认**透明** |
-| `light` | number | ❌ | 补光强度，默认 `0`（不补光）；`>0` 时在相机就位后追加一盏**rotation 与相机一致的平行光**，**推荐 `2`**（水平视角下也能保证物体清晰可见） |
-
-**坐标约定**：相机世界位置 = 隔离位置 `(9999,9999,9999)` + `offset`；`LookAt` 朝向隔离位置。
-因此其它场景物体位于相机背后（约 9999 单位外），不会进入画面。
-
-**返回结构**：
-
-```json
-{
-  "path": "Assets/Prefabs/Tree.prefab",
-  "resolvedPath": "Assets/Prefabs/Tree.prefab",
-  "output": "C:\\...\\out\\tree.png",
-  "cameraType": "perspective",
-  "width": 1920,
-  "height": 1080,
-  "cameraPosition": { "x": 10002, "y": 10001, "z": 10004 },
-  "lookAt": { "x": 9999, "y": 9999, "z": 9999 },
-  "fillLight": 0,
-  "bytes": 10570
-}
-```
-
-> 注意：截图使用**当前激活场景的灯光**渲染。若场景没有平行光，预制体可能偏暗——
-> 请确保截图时场景具备合适照明。也可直接用 `--light <强度>` 让命令临时追加一盏**rotation 与相机
-> 一致的平行光**补光（Unity 平行光光线方向即 `transform.forward`，与相机一致时从相机方向照向物体，
-> 相机指向任何方向物体正面都亮），**推荐 `--light 2`**；`light=0`（默认）则不补光；该补光在相机
-> 渲染完成后立即销毁，不会留在场景里。
-
----
-
-## 七、如何扩展新命令（核心能力）
+## 五、如何扩展新命令（核心能力）
 
 新增命令 = 新建一个静态方法 + 打上特性，**不需要改任何其他代码**：
 
@@ -443,15 +206,12 @@ namespace UnityPythonBridge.Commands
 
 > ⚠️ **重要**：返回对象会被 `JsonUtility.ToJson` 序列化，因此**必须是 `[Serializable]` 类
 > 或 Unity 支持的容器**（List / 数组 / Vector3 等），不能返回匿名类型。若需要新参数，在
-> `BridgeContext.cs` 的 `BridgeArgs` 类中追加字段即可。
+> `BridgeContext.cs` 的 `BridgeArgs` 类中追加字段即可（字段名即 JSON 键名）。注意：**新增字段前先全文件搜索同名**，避免与既有字段重名导致 CS0102 编译错误（如 `count` 已被 terrain 与 debug.get_logs 共用）。
 
-保存后重新编译，Python 侧即可使用（已有子命令直接调用，或通用方式）：
+保存后触发重编译（Unity 前台），Python 侧即可使用：
 
 ```bash
-# 已有专用子命令（debug 系列）
-python -m unity_bridge debug-log "hello"
-python -m unity_bridge dlogw "warning" 
-python -m unity_bridge dloge "error"
+python -m unity_bridge reload --expect-version <新版本号>
 
 # 或直接用 Python API 调用任意命令
 python -c "
@@ -473,7 +233,7 @@ public static object MethodName(BridgeContext ctx, BridgeArgs args)
 
 ---
 
-## 八、协议参考
+## 六、协议参考
 
 ```jsonc
 // 请求（一行）
@@ -490,10 +250,12 @@ public static object MethodName(BridgeContext ctx, BridgeArgs args)
 
 ---
 
-## 九、目录结构
+## 七、目录结构
 
 ```
 unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
+├── COMMANDS.md                     # 完整命令列表（34 条，含参数与示例）
+├── bridge.ini                      # 运行时配置：端口 [server] port / 重编译超时 [reload] timeout
 ├── Editor/                         ← 纯编辑器工具（Editor 程序集，不进 Player）
 │   ├── BridgeManagerInspector.cs   # BridgeManager 的 Inspector 按钮 + Tools 菜单快捷入口
 │   └── BridgeAutoRestart.cs        # 服务器状态持久化 + 重编译后自动恢复（时机管理）
@@ -509,16 +271,17 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │   └── Commands/
 │       ├── SceneTreeCommand.cs     # 命令 scene.tree
 │       ├── MeshBoundsCommand.cs    # 命令 mesh.bounds（包围盒计算）
-│       ├── PrefabScreenshotCommand.cs  # 命令 prefab.screenshot（隔离复制+相机截图）
+│       ├── PrefabScreenshotCommand.cs  # 命令 prefab.screenshot（隔离复制+相机截图，支持 camPos/lookAt）
 │       ├── TerrainCommands.cs      # 命令 terrain.*（高度图/纹理/植被/树木，Unity 原生 TerrainData）
 │       ├── TerrainStashCommands.cs # 命令 terrain.stash / apply_stash / stash_delete / stash_list（快照 JSON）
 │       ├── ViewScreenshotCommand.cs # 命令 view.camera（抓取指定相机实时画面；预留 view.window）
 │       ├── GameObjectCommands.cs   # 命令 gameobject.get / gameobject.set（active/position/rotation/scale）
 │       ├── SystemCommands.cs       # bridge.ping / bridge.list_commands / bridge.version / bridge.reload
-│       └── DebugCommands.cs        # debug.log / debug.log_warning / debug.log_error / debug.get_logs / debug.log_version
+│       └── DebugCommands.cs        # debug.log / log_warning / log_error / get_logs / log_version
 └── python/                         # Python 侧（无需安装依赖）
     ├── unity_bridge/
     │   ├── __init__.py
+    │   ├── config.py               # 读取 bridge.ini（端口/超时默认值，CLI 与 client 共用）
     │   ├── client.py               # TCP/JSON 客户端 UnityClient
     │   ├── cli.py                  # 命令行入口（tree / list / mesh-bounds / screenshot / terrain / reload / debug）
     │   └── __main__.py             # 支持 python -m unity_bridge
@@ -529,11 +292,12 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 
 ---
 
-## 十、安全与注意事项
+## 八、安全与注意事项
 
 - 服务器**只绑定 127.0.0.1**，仅本机进程可访问，不会暴露到局域网。
 - 命令在主线程执行，避免 Unity API 跨线程调用崩溃。
 - 销毁场景中的 BridgeManager 组件/物体（若挂了）会自动停止服务器，不留后台线程。
 - 若要在打包后的 Player 中使用，请自行评估：本项目针对 **Editor 开发期工具** 场景。
-- **首次导入后**：Unity 会为脚本生成 `.meta` 文件（GUID）。若希望跨项目复制时保持 GUID
-  稳定（推荐），请把生成的 `.meta` 一并提交到 git。
+- **首次导入后**：Unity 会为脚本生成 `.meta` 文件（GUID）。若希望跨项目复制时保持 GUID 稳定（推荐），请把生成的 `.meta` 一并提交到 git。
+- **自动化编译**：`bridge.reload` 是进程内 API，可稳定触发重编译（需 Unity 前台）；**模拟鼠标点击对 Unity 编辑器无效**（编辑器忽略注入输入），不要走那条路。
+- **版本演进**（当前 v1.8.0）：v1.0.0=独立重构（JsonUtility，5 条命令）→ v1.1.0=新增 12 条 terrain 命令 → v1.2.0=修复 list_commands 序列化 + 版本工具 → v1.3.0=新增 terrain.stash 四命令、view.camera、gameobject.get/set → v1.4.0=新增 debug.get_logs → v1.5.0=新增 debug.log_version → v1.6.0=版本号维护 → v1.7.0=服务器重复启动/停止打印 Warning → v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标。可用 `python -m unity_bridge version` 或 `debug-log-version` 确认当前版本。
