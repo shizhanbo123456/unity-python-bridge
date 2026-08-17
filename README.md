@@ -6,6 +6,17 @@
 
 > 📖 **完整命令列表见 [`COMMANDS.md`](COMMANDS.md)**（34 条，按功能分类：系统 / 调试 / 相机截图 / 场景 / 网格 / 物体 / 地形；含全部参数与示例）。本 README 只讲架构、连接、配置与用法。
 
+## 📚 文档导航（按需阅读）
+
+| 文档 | 适合谁 / 什么时候读 | 内容 |
+|---|---|---|
+| [`GETTING_STARTED.md`](GETTING_STARTED.md) | **第一次接触**（读一遍即可） | 环境前置、一分钟速览、安装三步验证、排障速查、术语表、命令影响边界、升级、安全边界 |
+| [`README.md`](README.md)（本文） | 想深入理解 | 架构总览、快速开始、连接与配置（端口/超时/bridge.ini/服务器生命周期/reload）、扩展命令、协议参考 |
+| [`COMMANDS.md`](COMMANDS.md) | **用命令时** | 34 条命令的完整参考：服务端命令名、CLI 别名、全部参数、常用工作流 |
+| [`FAQ.md`](FAQ.md) | **遇到问题 / 已知坑** | 连接、编译 reload、命令使用、命令相关 bug、环境维护的常见问题 |
+
+> 建议路径：新手先读 GETTING_STARTED 一次 → 用命令查 COMMANDS → 出问题查 FAQ → 需要原理再回来看本文。
+
 ---
 
 ## 一、架构总览
@@ -254,7 +265,10 @@ public static object MethodName(BridgeContext ctx, BridgeArgs args)
 
 ```
 unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
+├── README.md                       # 本文档：架构/连接/配置/扩展/协议 + 文档导航
+├── GETTING_STARTED.md              # 新手入门（读一遍即可）：环境/安装验证/术语/影响边界/安全
 ├── COMMANDS.md                     # 完整命令列表（34 条，含参数与示例）
+├── FAQ.md                          # 常见问题与已知坑（连接/编译/命令/bug/环境）
 ├── bridge.ini                      # 运行时配置：端口 [server] port / 重编译超时 [reload] timeout
 ├── Editor/                         ← 纯编辑器工具（Editor 程序集，不进 Player）
 │   ├── BridgeManagerInspector.cs   # BridgeManager 的 Inspector 按钮 + Tools 菜单快捷入口
