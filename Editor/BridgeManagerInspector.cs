@@ -56,14 +56,14 @@ namespace UnityPythonBridge
         {
             BridgeServer.Start();
             BridgeAutoRestart.SaveState(true);
-            Debug.Log($"[UnityPythonBridge] 服务器已启动，监听 127.0.0.1:{BridgeServer.Port}（状态已持久化）");
+            // 启动日志由 BridgeServer.Start() 统一输出（菜单/按钮/自动恢复三条路径一致，避免重复）
         }
 
         private static void StopServer()
         {
             BridgeServer.Stop();
             BridgeAutoRestart.SaveState(false);
-            Debug.Log("[UnityPythonBridge] 服务器已停止（状态已持久化）");
+            // 停止日志由 BridgeServer.Stop() 统一输出
         }
 
         // ============ 菜单快捷入口（替代原 BridgeWindow） ============
