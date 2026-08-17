@@ -116,6 +116,19 @@ namespace UnityPythonBridge.Commands
             return new GetLogsResult { count = entries.Count, entries = entries.ToArray() };
         }
 
+        [BridgeCommand("debug.log_version", "在 Unity Console 打印桥接层版本号（含命令总数）。参数: 无")]
+        public static object LogVersion(BridgeContext ctx, BridgeArgs args)
+        {
+            var info = BridgeInfo.GetVersionInfo();
+            Debug.Log($"[Bridge] 版本号: v{info.version}（共 {info.commandCount} 条命令，含 terrain.* {info.terrainCommandCount} 条）");
+            return new LogResult
+            {
+                level = "info",
+                message = $"v{info.version}",
+                logged = true,
+            };
+        }
+
         /// <summary>日志缓冲内部条目（不参与序列化）。</summary>
         private struct LogEntry
         {

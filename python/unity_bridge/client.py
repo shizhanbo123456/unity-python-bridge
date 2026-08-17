@@ -118,6 +118,10 @@ class UnityClient:
         """
         return self.call("debug.get_logs", count=count, type=type_)
 
+    def debug_log_version(self) -> dict:
+        """在 Unity Console 打印桥接层版本号（含命令总数）。"""
+        return self.call("debug.log_version")
+
     def scene_tree(self, components: bool = False) -> dict:
         return self.call("scene.tree", components=components)
 

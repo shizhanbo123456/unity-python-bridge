@@ -59,6 +59,7 @@ COMMANDS = [
     {"name": "debug.log_warning", "description": "在 Unity Console 打印一条 Warning 日志。参数: message(string)"},
     {"name": "debug.log_error", "description": "在 Unity Console 打印一条 Error 日志。参数: message(string)"},
     {"name": "debug.get_logs", "description": "读取最近 N 条 Console 日志（环形缓冲）。参数: count(int,可选,默认50), type(string,可选 all/log/warning/error/exception)"},
+    {"name": "debug.log_version", "description": "在 Unity Console 打印桥接层版本号（含命令总数）。参数: 无"},
     {"name": "scene.tree", "description": "以树状结构返回当前场景中的物体层级。参数: components(bool)"},
     {"name": "mesh.bounds", "description": "计算 Assets 中网格/模型/预制体的轴对齐包围盒。参数: path(string)"},
     {"name": "prefab.screenshot", "description": "将预制体复制到场景隔离位置并截图保存为 PNG（旋转保持资产原有，摄制后销毁临时对象）。参数: path(string), offset{x,y,z}, output(string,.png), orthographic(bool), fov(number), width(int), height(int), bg(string)"},
@@ -133,7 +134,7 @@ def handle_client(client: socket.socket) -> None:
                 if cmd == "bridge.ping":
                     data = {"pong": True, "time": "2026-08-15T10:00:00Z"}
                 elif cmd == "bridge.version":
-                    data = {"version": "1.4.0", "commandCount": len(COMMANDS),
+                    data = {"version": "1.5.0", "commandCount": len(COMMANDS),
                             "terrainCommandCount": sum(1 for c in COMMANDS if c["name"].startswith("terrain."))}
                 elif cmd == "bridge.reload":
                     data = {"requested": True,
@@ -151,6 +152,8 @@ def handle_client(client: socket.socket) -> None:
                             "logged": True}
                 elif cmd == "debug.get_logs":
                     data = mock_get_logs(args)
+                elif cmd == "debug.log_version":
+                    data = mock_log_version()
                 elif cmd == "bridge.list_commands":
                     data = {"count": len(COMMANDS), "commands": COMMANDS}
                 elif cmd == "scene.tree":
@@ -245,6 +248,12 @@ def mock_get_logs(args: dict) -> dict:
     recent = MOCK_LOGS[-count:]
     entries = [e for e in recent if filter_ == "all" or e["type"] == filter_]
     return {"count": len(entries), "entries": entries}
+
+
+def mock_log_version() -> dict:
+    """离线模拟 debug.log_version：记录一条版本日志并返回结果。"""
+    mock_append_log("log", "版本号: v1.5.0（mock）")
+    return {"level": "info", "message": "v1.5.0", "logged": True}
 
 
 def _png_chunk(tag: bytes, data: bytes) -> bytes:

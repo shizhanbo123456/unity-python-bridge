@@ -172,6 +172,16 @@ def _cmd_debug_logs(args) -> int:
     return 0
 
 
+def _cmd_debug_log_version(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.debug_log_version()
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"logged: {data.get('logged')}  level={data.get('level')}  message={data.get('message')}")
+    return 0
+
+
 def _cmd_mesh_bounds(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.mesh_bounds(args.path)
@@ -680,6 +690,11 @@ def build_parser() -> argparse.ArgumentParser:
                            help="按类型过滤（默认 all）")
     p_dbglogs.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_dbglogs.set_defaults(func=_cmd_debug_logs)
+
+    p_dbgv = sub.add_parser("debug-log-version", aliases=["dlogv"],
+                            help="在 Unity Console 打印桥接层版本号（含命令总数）")
+    p_dbgv.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_dbgv.set_defaults(func=_cmd_debug_log_version)
 
     p_bounds = sub.add_parser(
         "mesh-bounds", aliases=["bounds"],
