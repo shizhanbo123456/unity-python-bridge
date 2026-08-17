@@ -171,7 +171,7 @@ python -m unity_bridge gset "Player/Body" --rotation "0,0.7071,0,0.7071" --quate
 > **坐标约定**：`position`=世界坐标；`rotation` 默认世界欧拉角、`quaternion=true` 时用四元数
 > （读与写一致）；`scale`=localScale（世界缩放只读，写入只能走本地缩放）。
 
-> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询，或用 `debug-log-version` 在 Console 打印。当前版本 **v1.6.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具 / v1.3.0=新增 terrain stash 四命令、view.camera、gameobject.get/set / v1.4.0=新增 debug.get_logs 读取 Console 日志 / v1.5.0=新增 debug.log_version 打印版本号 / v1.6.0=版本号维护；reload、Flush 驱动等改动保持原版本号）。
+> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询，或用 `debug-log-version` 在 Console 打印。当前版本 **v1.7.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具 / v1.3.0=新增 terrain stash 四命令、view.camera、gameobject.get/set / v1.4.0=新增 debug.get_logs 读取 Console 日志 / v1.5.0=新增 debug.log_version 打印版本号 / v1.6.0=版本号维护 / v1.7.0=服务器重复启动/停止打印 Warning；reload、Flush 驱动等改动保持原版本号）。
 
 **触发重编译并等待恢复**：
 

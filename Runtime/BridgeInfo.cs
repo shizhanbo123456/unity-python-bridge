@@ -20,8 +20,9 @@ namespace UnityPythonBridge
         ///   v1.4.0 新增 debug.get_logs（读取最近 Console 日志，环形缓冲）
         ///   v1.5.0 新增 debug.log_version（在 Console 打印版本号）
         ///   v1.6.0 版本号维护
+        ///   v1.7.0 服务器重复启动/停止时打印 Warning 提示
         /// </summary>
-        public const string Version = "1.6.0";
+        public const string Version = "1.7.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

@@ -82,7 +82,11 @@ namespace UnityPythonBridge
         /// 读不到或无效则回退到 DefaultPort（21927）。</summary>
         public static void Start(int? port = null)
         {
-            if (_running) return;
+            if (_running)
+            {
+                Debug.LogWarning($"[UnityPythonBridge] 服务器已在运行中（监听 127.0.0.1:{Port}），忽略重复启动");
+                return;
+            }
 
             Port = port ?? ReadServerPortFromIni();
             _running = true;
@@ -102,7 +106,11 @@ namespace UnityPythonBridge
 
         public static void Stop()
         {
-            if (!_running) return;
+            if (!_running)
+            {
+                Debug.LogWarning("[UnityPythonBridge] 服务器未在运行，忽略重复停止");
+                return;
+            }
             _running = false;
             EditorApplication.update -= OnEditorUpdate;
             try { _listener?.Stop(); } catch (Exception) { /* 忽略 */ }
