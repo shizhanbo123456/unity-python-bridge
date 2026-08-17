@@ -19,8 +19,9 @@ namespace UnityPythonBridge
         ///   v1.3.0 新增 terrain.stash 四命令（快照 JSON）+ view.camera（抓指定相机）+ gameobject.get/set
         ///   v1.4.0 新增 debug.get_logs（读取最近 Console 日志，环形缓冲）
         ///   v1.5.0 新增 debug.log_version（在 Console 打印版本号）
+        ///   v1.6.0 版本号维护
         /// </summary>
-        public const string Version = "1.5.0";
+        public const string Version = "1.6.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

@@ -134,7 +134,7 @@ def handle_client(client: socket.socket) -> None:
                 if cmd == "bridge.ping":
                     data = {"pong": True, "time": "2026-08-15T10:00:00Z"}
                 elif cmd == "bridge.version":
-                    data = {"version": "1.5.0", "commandCount": len(COMMANDS),
+                    data = {"version": "1.6.0", "commandCount": len(COMMANDS),
                             "terrainCommandCount": sum(1 for c in COMMANDS if c["name"].startswith("terrain."))}
                 elif cmd == "bridge.reload":
                     data = {"requested": True,
@@ -252,8 +252,8 @@ def mock_get_logs(args: dict) -> dict:
 
 def mock_log_version() -> dict:
     """离线模拟 debug.log_version：记录一条版本日志并返回结果。"""
-    mock_append_log("log", "版本号: v1.5.0（mock）")
-    return {"level": "info", "message": "v1.5.0", "logged": True}
+    mock_append_log("log", "版本号: v1.6.0（mock）")
+    return {"level": "info", "message": "v1.6.0", "logged": True}
 
 
 def _png_chunk(tag: bytes, data: bytes) -> bytes:
