@@ -218,6 +218,20 @@ def _cmd_screenshot(args) -> int:
         print(f"[错误] output 必须是 .png 文件路径（当前: {args.output}）", file=sys.stderr)
         return 1
 
+    def _vec3_list(s: str):
+        parts = [float(x) for x in s.replace(",", " ").split()]
+        if len(parts) != 3:
+            raise ValueError("需要 3 个分量，格式 'x,y,z'")
+        return parts
+
+    cam_pos = look_at = None
+    try:
+        cam_pos = _vec3_list(args.camPos) if args.camPos else None
+        look_at = _vec3_list(args.lookAt) if args.lookAt else None
+    except ValueError as e:
+        print(f"[错误] camPos/lookAt 解析失败: {e}", file=sys.stderr)
+        return 1
+
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.prefab_screenshot(
             path=args.path,
@@ -229,6 +243,9 @@ def _cmd_screenshot(args) -> int:
             height=args.height,
             bg=args.bg,
             light=args.light,
+            camera_position=cam_pos,
+            look_at=look_at,
+            relative=args.relative,
         )
 
     if args.json:
@@ -709,7 +726,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_shot.add_argument("path", help="目标预制体在 Assets 中的相对路径（.prefab / 模型文件）")
     p_shot.add_argument("output", help="PNG 输出路径（必须以 .png 结尾）")
     p_shot.add_argument("--offset", required=True,
-                        help="相机相对预制体的位置，格式 'x,y,z'（如 '3,2,5'）")
+                        help="相机相对预制体的位置，格式 'x,y,z'（如 '3,2,5'；camPos 缺省时使用）")
+    p_shot.add_argument("--camPos", default=None,
+                        help="相机位置 'x,y,z'（默认世界坐标；--relative 时相对预制体位置）")
+    p_shot.add_argument("--lookAt", default=None,
+                        help="观察目标 'x,y,z'（默认世界坐标；--relative 时相对预制体位置；缺省为预制体）")
+    p_shot.add_argument("--relative", action="store_true",
+                        help="camPos/lookAt 按相对预制体位置解释（默认世界坐标）")
     p_shot.add_argument("--orthographic", action="store_true", help="使用正交相机（默认透视）")
     p_shot.add_argument("--fov", type=float, default=None,
                         help="视野：透视=fieldOfView，正交=orthographicSize（默认 Unity 默认）")

@@ -32,6 +32,12 @@ namespace UnityPythonBridge
         public string path;
         public string output;
         public Vector3 offset;
+        /// <summary>prefab.screenshot：相机世界坐标（float[] 3）；relative=true 时解释为相对预制体位置。缺省回退 offset。</summary>
+        public float[] cameraPosition;
+        /// <summary>prefab.screenshot：观察目标世界坐标（float[] 3）；relative=true 时解释为相对预制体位置。缺省为预制体位置。</summary>
+        public float[] lookAt;
+        /// <summary>prefab.screenshot：cameraPosition/lookAt 是否按相对预制体位置解释（默认 false=世界坐标）。</summary>
+        public bool relative;
         public bool orthographic;
         public float fov;
         public int width;

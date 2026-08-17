@@ -86,8 +86,14 @@ python -m unity_bridge mesh-bounds Assets/Models/Rock.fbx
 python -m unity_bridge bounds Assets/Prefabs/Tree.prefab --json
 
 # 将预制体复制到场景隔离位置并截图保存为 PNG
-#   path/output 为位置参数；--offset 为相机相对预制体的位置（必填，格式 "x,y,z"）
+#   path/output 为位置参数；--offset 为相机相对预制体的位置（必填，格式 "x,y,z"；camPos 缺省时使用）
 python -m unity_bridge screenshot Assets/Prefabs/Tree.prefab out/tree.png --offset "3,2,5"
+
+# 直接指定相机位置与观察目标（世界坐标；也可 --relative 改为相对预制体位置）
+python -m unity_bridge screenshot Assets/Prefabs/Tree.prefab out/tree.png \
+    --offset "0,0,0" --camPos "5,3,8" --lookAt "0,0,0"
+python -m unity_bridge screenshot Assets/Prefabs/Rock.fbx out/rock.png \
+    --offset "0,0,0" --camPos "0,2,5" --lookAt "0,1,0" --relative
 
 # 正交相机 + 指定视野/分辨率/背景色；shot 为 screenshot 的别名
 python -m unity_bridge shot Assets/Prefabs/Rock.fbx out/rock.png --offset "0,0,-8" \
@@ -114,7 +120,7 @@ python -m unity_bridge tree --components
 |---|---|---|---|---|
 | `scene.tree` | 场景读取 | 树状返回当前激活场景的物体层级 | `tree` | `components`(bool, 可选，显组件类型) |
 | `mesh.bounds` | 资源查询 | 计算 Assets 中 mesh / 模型 / prefab 的轴对齐包围盒（AABB，多网格合并） | `mesh-bounds`（`bounds`） | `path`(string, Assets 相对路径) |
-| `prefab.screenshot` | 资源查询 | 隔离复制 prefab 到 `(9999,9999,9999)` + 相机环绕 `LookAt` 渲染存 PNG（**旋转保持资产原有**；支持正交/透视、`fov`、`bg`、补光） | `screenshot`（`shot`） | `path`、`output`(.png)、`offset`("x,y,z")、`orthographic`、`fov`、`width`、`height`、`bg`、`light` |
+| `prefab.screenshot` | 资源查询 | 隔离复制 prefab 到 `(9999,9999,9999)` + 相机环绕 `LookAt` 渲染存 PNG（**旋转保持资产原有**；支持正交/透视、`fov`、`bg`、补光；可**直接指定相机位置与观察目标**，世界坐标或相对预制体） | `screenshot`（`shot`） | `path`、`output`(.png)、`offset`("x,y,z")、`camPos`("x,y,z")、`lookAt`("x,y,z")、`relative`、`orthographic`、`fov`、`width`、`height`、`bg`、`light` |
 | `bridge.ping` | 系统 | 连通性测试，返回 `pong` + 服务器时间 | 无专用子命令（`client.ping()` / `client.call("bridge.ping")` / 原始 TCP） | 无 |
 | `bridge.list_commands` | 系统 | 列出所有已注册命令 | `list`（`ls`） | 无 |
 | `bridge.version` | 系统 | 返回桥接层版本号与命令统计，确认 Unity 侧代码是否为最新 | `version`（`ver`/`v`） | 无 |
@@ -171,7 +177,7 @@ python -m unity_bridge gset "Player/Body" --rotation "0,0.7071,0,0.7071" --quate
 > **坐标约定**：`position`=世界坐标；`rotation` 默认世界欧拉角、`quaternion=true` 时用四元数
 > （读与写一致）；`scale`=localScale（世界缩放只读，写入只能走本地缩放）。
 
-> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询，或用 `debug-log-version` 在 Console 打印。当前版本 **v1.7.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具 / v1.3.0=新增 terrain stash 四命令、view.camera、gameobject.get/set / v1.4.0=新增 debug.get_logs 读取 Console 日志 / v1.5.0=新增 debug.log_version 打印版本号 / v1.6.0=版本号维护 / v1.7.0=服务器重复启动/停止打印 Warning；reload、Flush 驱动等改动保持原版本号）。
+> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询，或用 `debug-log-version` 在 Console 打印。当前版本 **v1.8.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具 / v1.3.0=新增 terrain stash 四命令、view.camera、gameobject.get/set / v1.4.0=新增 debug.get_logs 读取 Console 日志 / v1.5.0=新增 debug.log_version 打印版本号 / v1.6.0=版本号维护 / v1.7.0=服务器重复启动/停止打印 Warning / v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标；reload、Flush 驱动等改动保持原版本号）。
 
 **触发重编译并等待恢复**：
 

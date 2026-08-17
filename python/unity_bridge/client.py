@@ -131,10 +131,13 @@ class UnityClient:
     def prefab_screenshot(self, path: str, offset: dict, output: str,
                           orthographic: bool = False, fov=None,
                           width: int = 1920, height: int = 1080, bg=None,
-                          light: float = 0.0) -> dict:
+                          light: float = 0.0, camera_position=None,
+                          look_at=None, relative: bool = False) -> dict:
         """将目标预制体复制到场景隔离位置并截图保存为 PNG。
 
-        offset 为相机相对预制体的位置，形如 {"x":, "y":, "z":}。
+        offset 为相机相对预制体的位置，形如 {"x":, "y":, "z":}（camera_position 缺省时使用）。
+        camera_position / look_at 为 [x,y,z]：relative=False 时是世界坐标，
+        relative=True 时是相对预制体位置（预制体在隔离点 (9999,9999,9999)）。
         fov / bg 为 None 时不发送，由 Unity 侧使用默认值。
         light 为补光强度，0（默认）不补光，>0 时追加一盏与相机同向的平行光。
         """
@@ -151,6 +154,12 @@ class UnityClient:
             args["fov"] = fov
         if bg is not None:
             args["bg"] = bg
+        if camera_position is not None:
+            args["cameraPosition"] = list(camera_position)
+        if look_at is not None:
+            args["lookAt"] = list(look_at)
+        if relative:
+            args["relative"] = True
         return self.call("prefab.screenshot", **args)
 
     # ---- Terrain 程序化编辑（Unity 原生 TerrainData API）----

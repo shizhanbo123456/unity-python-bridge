@@ -134,7 +134,7 @@ def handle_client(client: socket.socket) -> None:
                 if cmd == "bridge.ping":
                     data = {"pong": True, "time": "2026-08-15T10:00:00Z"}
                 elif cmd == "bridge.version":
-                    data = {"version": "1.7.0", "commandCount": len(COMMANDS),
+                    data = {"version": "1.8.0", "commandCount": len(COMMANDS),
                             "terrainCommandCount": sum(1 for c in COMMANDS if c["name"].startswith("terrain."))}
                 elif cmd == "bridge.reload":
                     data = {"requested": True,
@@ -252,8 +252,8 @@ def mock_get_logs(args: dict) -> dict:
 
 def mock_log_version() -> dict:
     """离线模拟 debug.log_version：记录一条版本日志并返回结果。"""
-    mock_append_log("log", "版本号: v1.7.0（mock）")
-    return {"level": "info", "message": "v1.7.0", "logged": True}
+    mock_append_log("log", "版本号: v1.8.0（mock）")
+    return {"level": "info", "message": "v1.8.0", "logged": True}
 
 
 def _png_chunk(tag: bytes, data: bytes) -> bytes:
@@ -291,7 +291,21 @@ def mock_screenshot(args: dict) -> dict:
     light = float(args.get("light", 0.0) or 0.0)
 
     iso = {"x": 9999, "y": 9999, "z": 9999}
-    cam_pos = {k: iso[k] + float(offset.get(k, 0)) for k in ("x", "y", "z")}
+    zero = {"x": 0.0, "y": 0.0, "z": 0.0}
+    cp = args.get("cameraPosition")
+    la = args.get("lookAt")
+    relative = bool(args.get("relative", False))
+
+    if cp and len(cp) >= 3:
+        base = iso if relative else zero
+        cam_pos = {k: base[k] + float(cp[i]) for i, k in enumerate(("x", "y", "z"))}
+    else:
+        cam_pos = {k: iso[k] + float(offset.get(k, 0)) for k in ("x", "y", "z")}
+    if la and len(la) >= 3:
+        base = iso if relative else zero
+        look_at = {k: base[k] + float(la[i]) for i, k in enumerate(("x", "y", "z"))}
+    else:
+        look_at = dict(iso)
 
     out_dir = os.path.dirname(os.path.abspath(output))
     if out_dir:
@@ -308,7 +322,7 @@ def mock_screenshot(args: dict) -> dict:
         "width": width,
         "height": height,
         "cameraPosition": cam_pos,
-        "lookAt": iso,
+        "lookAt": look_at,
         "fillLight": light if light > 0 else 0,
         "bytes": len(png),
     }

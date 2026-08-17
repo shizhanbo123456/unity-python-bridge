@@ -30,7 +30,10 @@ namespace UnityPythonBridge.Commands
     ///
     /// 参数（BridgeArgs）:
     ///   path (string)        - 目标预制体在 Assets 中的相对路径（.prefab 或模型文件）
-    ///   offset (Vector3)     - 相机相对于预制体位置 (9999,9999,9999) 的偏移，{x,y,z}
+    ///   offset (Vector3)     - 相机相对于预制体位置 (9999,9999,9999) 的偏移，{x,y,z}（cameraPosition 缺省时使用）
+    ///   cameraPosition (float[]) - 相机位置 {x,y,z}；relative=false 为世界坐标，relative=true 为相对预制体位置
+    ///   lookAt (float[])     - 观察目标 {x,y,z}；relative=false 为世界坐标，relative=true 为相对预制体位置；缺省为预制体位置
+    ///   relative (bool)      - cameraPosition/lookAt 是否按相对预制体位置解释（默认 false=世界坐标）
     ///   output (string)      - PNG 输出路径（必须以 .png 结尾）
     ///   orthographic (bool)  - 是否使用正交相机，默认 false（透视）
     ///   fov (float)          - 视野：透视时=fieldOfView，正交时=orthographicSize；<=0 使用 Unity 默认
@@ -48,7 +51,9 @@ namespace UnityPythonBridge.Commands
         private static readonly Vector3 Isolation = new Vector3(9999f, 9999f, 9999f);
 
         [BridgeCommand("prefab.screenshot",
-            "将目标预制体复制到场景隔离位置并截图保存为 PNG（旋转保持资产原有，摄制后销毁临时对象）。参数: path(string), offset{x,y,z}, " +
+            "将目标预制体复制到场景隔离位置并截图保存为 PNG（旋转保持资产原有，摄制后销毁临时对象）。参数: path(string), " +
+            "offset{x,y,z}（缺省相机相对预制体偏移）, cameraPosition(float[]3,相机位置,relative时相对预制体), " +
+            "lookAt(float[]3,观察目标,缺省预制体位置), relative(bool,默认false=世界坐标), " +
             "output(string,.png), orthographic(bool,默认false), fov(number,默认Unity默认), " +
             "width(int,默认1920), height(int,默认1080), bg(string r,g,b,a,默认透明), " +
             "light(number,默认0不补光;>0追加与相机同向平行光)")]
@@ -94,12 +99,33 @@ namespace UnityPythonBridge.Commands
                 instance.transform.position = Isolation;
                 instance.transform.localScale = Vector3.one;
 
-                // 2) 创建相机：移动到相对位置后 LookAt 预制体
+                // 2) 创建相机：相机位置与观察目标，优先 cameraPosition/lookAt（relative 时相对隔离点），
+                //    否则回退到 offset（相机相对预制体偏移、观察预制体）
+                Vector3 camPos;
+                Vector3 lookTarget;
+                if (args.cameraPosition != null && args.cameraPosition.Length >= 3)
+                {
+                    var cp = new Vector3(args.cameraPosition[0], args.cameraPosition[1], args.cameraPosition[2]);
+                    camPos = args.relative ? Isolation + cp : cp;
+                }
+                else
+                {
+                    camPos = Isolation + offset;
+                }
+                if (args.lookAt != null && args.lookAt.Length >= 3)
+                {
+                    var la = new Vector3(args.lookAt[0], args.lookAt[1], args.lookAt[2]);
+                    lookTarget = args.relative ? Isolation + la : la;
+                }
+                else
+                {
+                    lookTarget = Isolation;
+                }
+
                 camGo = new GameObject("BridgeScreenshotCamera");
                 var cam = camGo.AddComponent<Camera>();
-                var camPos = Isolation + offset;
                 camGo.transform.position = camPos;
-                camGo.transform.LookAt(Isolation);
+                camGo.transform.LookAt(lookTarget);
 
                 // 2.5) 补光：追加一盏与相机朝向一致的平行光（light>0 时）
                 if (lightIntensity > 0)
@@ -153,7 +179,7 @@ namespace UnityPythonBridge.Commands
                     width = width,
                     height = height,
                     cameraPosition = camPos,
-                    lookAt = Isolation,
+                    lookAt = lookTarget,
                     fillLight = lightIntensity > 0 ? lightIntensity : 0f,
                     bytes = png.Length,
                 };
