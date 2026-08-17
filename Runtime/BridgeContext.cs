@@ -67,6 +67,30 @@ namespace UnityPythonBridge
         public float maxScale;
         public float[] positions;   // 树木位置列表，每 3 个一组 {x, y, z}（归一化 0~1）
         public bool random;
+
+        // ---- terrain stash（stash / apply_stash / stash_delete / stash_list）----
+        /// <summary>stash 类型："trees" / "details" / "all"（省略时默认 "all"）。</summary>
+        public string type;
+        /// <summary>stash 名称（不含扩展名，如 "forest_v1"）。同名保存会报错，不允许覆盖。</summary>
+        public string name;
+
+        // ---- view.camera（抓取指定相机）----
+        /// <summary>相机 GameObject 名称；省略时依次找 MainCamera / 名为 Main Camera 的 / 第一个相机。</summary>
+        public string camera;
+
+        // ---- gameobject.get / gameobject.set ----
+        /// <summary>目标物体：层级路径（如 "Player/Body"）优先，单个名称兼容（重名时报错）。</summary>
+        public string target;
+        /// <summary>rotation 是否用四元数表示（默认 false=欧拉角）。get 输出与 set 输入一致。</summary>
+        public bool quaternion;
+        /// <summary>gameobject.set：active 目标值，-1=不修改，0=SetActive(false)，1=SetActive(true)。</summary>
+        public int active;
+        /// <summary>gameobject.set：position 世界坐标（float[] 3），null=不修改。</summary>
+        public float[] position;
+        /// <summary>gameobject.set：rotation，默认欧拉角（float[] 3）；quaternion=true 时为四元数（float[] 4），null=不修改。</summary>
+        public float[] rotation;
+        /// <summary>gameobject.set：localScale（float[] 3），null=不修改。</summary>
+        public float[] scale;
     }
 
     /// <summary>TCP 请求行：{id, cmd, args}。</summary>

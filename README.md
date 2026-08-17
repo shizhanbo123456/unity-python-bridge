@@ -106,7 +106,7 @@ python -m unity_bridge tree --components
 
 ---
 
-## 三、命令总览（25 条：7 基础 + 3 调试 + 15 Terrain）
+## 三、命令总览（32 条：7 基础 + 3 调试 + 19 Terrain + 1 视图 + 2 物体）
 
 ### A. 基础命令（7 条）
 
@@ -128,7 +128,48 @@ python -m unity_bridge tree --components
 | `debug.log_warning` | 在 Unity Console 打印一条 Warning 日志 | `debug-log-warning`（`dlogw`） | `message` |
 | `debug.log_error` | 在 Unity Console 打印一条 Error 日志 | `debug-log-error`（`dloge`） | `message` |
 
-> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询。当前版本 **v1.2.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具；后续 debug 命令、reload、Flush 驱动下沉均保持 v1.2.0）。
+### A3. 视图与物体操作命令（3 条）
+
+| 命令 (bus name) | 功能 | Python CLI | 关键参数 |
+|---|---|---|---|
+| `view.camera` | 渲染**指定相机的实时画面**保存为 PNG（默认 MainCamera） | `view-screenshot`（`vshot`） | `output`(.png)、`camera`(可选，默认 MainCamera)、`width`、`height`(可选，默认相机当前分辨率) |
+| `gameobject.get` | 读取 GameObject 的 active 状态与 Transform 的 position/rotation/scale | `gameobject-get`（`gget`） | `target`(路径优先/名称兼容)、`quaternion`(可选) |
+| `gameobject.set` | 写入 active / position / rotation / scale（支持 Undo） | `gameobject-set`（`gset`） | `target`、`active`(-1 不改/0 隐藏/1 激活)、`position`、`rotation`、`scale`、`quaternion` |
+
+> **view.\* 命名约定**：`view.camera` 抓取**场景中已有相机的实时渲染**；未来会新增
+> `view.window`（截取 Unity 界面 Scene/Game 窗口的**最终呈现**，含 UI/叠加层）。二者与
+> `prefab.screenshot`（隔离渲染单个资产）职责互不重叠，新截图类功能请归入 `view.*` 命名空间。
+
+**view.camera 示例**：
+
+```bash
+# 默认相机（依次找 tag=MainCamera / 名为 Main Camera 的 / 第一个激活相机）
+python -m unity_bridge view-screenshot out/gameview.png
+
+# 指定相机与分辨率
+python -m unity_bridge vshot out/ui.png --camera "UICamera" --width 1280 --height 720
+```
+
+**gameobject 示例**：
+
+```bash
+# 读取物体状态（路径定位；名称唯一时也可直接传名称）
+python -m unity_bridge gameobject-get "Player/Body/LeftArm"
+python -m unity_bridge gget "Player" --quaternion        # 附带输出四元数
+
+# 写入：隐藏物体 + 改世界坐标/欧拉角/本地缩放（支持 Undo）
+python -m unity_bridge gameobject-set "Player" --active 0 --position "1,2,3" --rotation "0,90,0" --scale "2,2,2"
+
+# 用四元数写入旋转
+python -m unity_bridge gset "Player/Body" --rotation "0,0.7071,0,0.7071" --quaternion
+```
+
+> **定位规则**：`target` 优先按层级路径（`Player/Body`，从场景根开始，'/' 分隔，重名可区分）；
+> 传单个名称时场景中唯一则命中，多个同名会报错并提示可用路径。
+> **坐标约定**：`position`=世界坐标；`rotation` 默认世界欧拉角、`quaternion=true` 时用四元数
+> （读与写一致）；`scale`=localScale（世界缩放只读，写入只能走本地缩放）。
+
+> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询。当前版本 **v1.3.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具 / v1.3.0=新增 terrain stash 四命令、view.camera、gameobject.get/set；debug 命令、reload、Flush 驱动等改动保持原版本号）。
 
 **触发重编译并等待恢复**：
 
@@ -159,7 +200,7 @@ python -m unity_bridge reload --timeout 180 --interval 2
 > 重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。
 > 注意：**Unity 失焦/后台时 `EditorApplication.update` 不运行，重编译不会自动触发**——执行 `reload` 前请让 Unity 窗口保持在前台。
 
-### B. Terrain 程序化编辑命令（15 条，Unity 原生 TerrainData API）
+### B. Terrain 程序化编辑命令（19 条：15 程序化编辑 + 4 stash 快照，Unity 原生 TerrainData API）
 
 > **公共参数**：`terrain`(string, 可选) —— 目标 Terrain 的 GameObject 名称，省略时取场景中**第一个** Terrain；区域参数 `xBase`/`zBase`/`width`/`height`(int, 可选) —— 操作区域，省略时默认整图。
 
@@ -180,6 +221,10 @@ python -m unity_bridge reload --timeout 180 --interval 2
 | `terrain.list_trees` | 树木 | 列出树原型与全部树实例（位置/缩放） | `terrain-list-trees`（`ttlist`） | `terrain` |
 | `terrain.add_trees` | 树木 | 添加树木：`positions`(float[] 每 3 个一组 {x,y,z} 归一化 0~1) **或** `random=true` + `count`/`seed`/`minScale`/`maxScale` 随机种植（自动贴地） | `terrain-add-trees`（`ttadd`） | `terrain`、`prototypeIndex`、`positions` / `random`、`count`、`seed`、`minScale`、`maxScale` |
 | `terrain.clear_trees` | 树木 | 清空 Terrain 上所有树实例 | `terrain-clear-trees`（`ttclear`） | `terrain` |
+| `terrain.stash` | stash | 把当前地形的**树木实例 / 植被密度图全量**序列化为 JSON 存到工具 stash 子目录（**同名报错，不允许覆盖**） | `terrain-stash`（`tstash`） | `terrain`、`type`(trees/details/all，默认 all)、`name`(必填，不含扩展名) |
+| `terrain.apply_stash` | stash | 读取 stash JSON 并**整体写回地形**（替换当前 trees/detail，原型数/分辨率不匹配会拒绝） | `terrain-apply-stash`（`tapply`） | `terrain`、`type`(默认 all)、`name`(必填) |
+| `terrain.stash_delete` | stash | 删除指定 stash 文件 | `terrain-stash-delete`（`tstashdel`） | `type`(必填 trees/details)、`name`(必填) |
+| `terrain.stash_list` | stash | 列出工具 stash 子目录下所有 stash 文件 | `terrain-stash-list`（`tstashlist`） | `type`(可选，默认 all) |
 
 **典型用法**：
 
@@ -212,6 +257,33 @@ python -m unity_bridge terrain-add-trees --prototypeIndex 0 --positions "0.25,0.
 # 清空树木
 python -m unity_bridge terrain-clear-trees
 ```
+
+**Stash 快照链路**（stash → clear → 截图看干净地形 → apply 恢复，配合 view.camera / screenshot 做截图调整）：
+
+```bash
+# 1) 把当前地形快照存为 JSON（存到 <Assets>/unity-python-bridge/stash/{trees|details}/<name>.json）
+python -m unity_bridge terrain-stash --name forest_v1 --type all
+python -m unity_bridge terrain-stash --name forest_v1 --type trees     # 只存树木
+
+# 2) 同名保存会直接报错（不允许覆盖），需先删除：
+python -m unity_bridge terrain-stash-delete --type trees --name forest_v1
+
+# 3) 查看已有 stash
+python -m unity_bridge terrain-stash-list
+
+# 4) 清空植被 → 观察/截图干净地形
+python -m unity_bridge terrain-clear-trees
+python -m unity_bridge terrain-set-details --layer 0 --data "0,..."    # 或手动清 detail
+python -m unity_bridge view-screenshot out/clean.png
+
+# 5) 恢复快照（整体替换，trees 自动贴地）
+python -m unity_bridge terrain-apply-stash --name forest_v1 --type all
+python -m unity_bridge view-screenshot out/restored.png
+```
+
+> **stash 存储说明**：文件为 UTF-8 JSON 文本，存放在工具根目录下 `stash/trees/` 与 `stash/details/`
+> 两个子目录（按类分组），**可进 git、可被 Python 直接读取**。`type=all` 时会写入两个文件。
+> 应用时校验树原型数 / 草原型数 / detail 分辨率，与当前地形不一致会拒绝应用（避免错位）。
 
 > **注意**：高度图 / 纹理 / 植被 / 树木的写入会立即应用到场景并标记 dirty（可保存）；修改后 Terrain 碰撞体会自动重建。所有命令均可用 `--json` 输出原始数据供程序化处理。
 
@@ -431,6 +503,9 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │       ├── MeshBoundsCommand.cs    # 命令 mesh.bounds（包围盒计算）
 │       ├── PrefabScreenshotCommand.cs  # 命令 prefab.screenshot（隔离复制+相机截图）
 │       ├── TerrainCommands.cs      # 命令 terrain.*（高度图/纹理/植被/树木，Unity 原生 TerrainData）
+│       ├── TerrainStashCommands.cs # 命令 terrain.stash / apply_stash / stash_delete / stash_list（快照 JSON）
+│       ├── ViewScreenshotCommand.cs # 命令 view.camera（抓取指定相机实时画面；预留 view.window）
+│       ├── GameObjectCommands.cs   # 命令 gameobject.get / gameobject.set（active/position/rotation/scale）
 │       ├── SystemCommands.cs       # bridge.ping / bridge.list_commands / bridge.version / bridge.reload
 │       └── DebugCommands.cs        # debug.log / debug.log_warning / debug.log_error
 └── python/                         # Python 侧（无需安装依赖）

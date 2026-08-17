@@ -6,6 +6,7 @@
 """
 
 import argparse
+import copy
 import json
 import os
 import socket
@@ -75,6 +76,13 @@ COMMANDS = [
     {"name": "terrain.list_trees", "description": "列出 Terrain 树原型与树实例。参数: terrain(string,可选)"},
     {"name": "terrain.add_trees", "description": "添加树木。参数: terrain, prototypeIndex, positions(float[]) 或 random/count/seed/minScale/maxScale"},
     {"name": "terrain.clear_trees", "description": "清空 Terrain 上所有树实例。参数: terrain(string,可选)"},
+    {"name": "terrain.stash", "description": "把当前地形的树木/植被全量序列化为 JSON 存到工具 stash 子目录（同名报错）。参数: terrain(string,可选), type(string,可选 trees/details/all), name(string,必填)"},
+    {"name": "terrain.apply_stash", "description": "读取 stash JSON 并整体写回地形。参数: terrain(string,可选), type(string,可选), name(string,必填)"},
+    {"name": "terrain.stash_delete", "description": "删除指定 stash 文件。参数: type(string,必填 trees/details), name(string,必填)"},
+    {"name": "terrain.stash_list", "description": "列出工具 stash 子目录下所有 stash 文件。参数: type(string,可选)"},
+    {"name": "view.camera", "description": "渲染指定相机的实时画面保存为 PNG（默认 MainCamera）。参数: camera(string,可选), output(string,.png), width(int,可选), height(int,可选)"},
+    {"name": "gameobject.get", "description": "读取 GameObject 的 active 状态与 Transform 的 position/rotation/scale。参数: target(string,必填,路径优先名称兼容), quaternion(bool,可选)"},
+    {"name": "gameobject.set", "description": "写入 GameObject 的 active 状态与 Transform 的 position/rotation/scale（支持 Undo）。参数: target(string,必填), active(int,可选 -1/0/1), position(float[]3), rotation(float[]3/4), scale(float[]3), quaternion(bool)"},
 ]
 
 # 离线模拟的 Terrain 状态（仅用于无 Unity 环境联调）
@@ -124,8 +132,8 @@ def handle_client(client: socket.socket) -> None:
                 if cmd == "bridge.ping":
                     data = {"pong": True, "time": "2026-08-15T10:00:00Z"}
                 elif cmd == "bridge.version":
-                    data = {"version": "1.2.0", "commandCount": len(COMMANDS),
-                            "terrainCommandCount": 12}
+                    data = {"version": "1.3.0", "commandCount": len(COMMANDS),
+                            "terrainCommandCount": sum(1 for c in COMMANDS if c["name"].startswith("terrain."))}
                 elif cmd == "bridge.reload":
                     data = {"requested": True,
                             "message": "[mock] 重编译已触发（模拟立即恢复）"}
@@ -177,6 +185,20 @@ def handle_client(client: socket.socket) -> None:
                     data = mock_add_trees(args)
                 elif cmd == "terrain.clear_trees":
                     data = mock_clear_trees()
+                elif cmd == "terrain.stash":
+                    data = mock_stash(args)
+                elif cmd == "terrain.apply_stash":
+                    data = mock_apply_stash(args)
+                elif cmd == "terrain.stash_delete":
+                    data = mock_stash_delete(args)
+                elif cmd == "terrain.stash_list":
+                    data = mock_stash_list(args)
+                elif cmd == "view.camera":
+                    data = mock_view_camera(args)
+                elif cmd == "gameobject.get":
+                    data = mock_go_get(args)
+                elif cmd == "gameobject.set":
+                    data = mock_go_set(args)
                 else:
                     raise KeyError(f"未知命令: {cmd}")
                 resp = {"id": req.get("id"), "ok": True, "data": data}
@@ -547,6 +569,281 @@ def mock_clear_trees() -> dict:
     removed = len(t["tree_instances"])
     t["tree_instances"].clear()
     return {"terrain": t["name"], "removed": removed}
+
+
+# ============ Terrain stash 模拟（内存态，复刻同名检查/删除/列表）============
+
+# MOCK_STASH[type][name] = { ...数据... }，type ∈ {"trees", "details"}
+MOCK_STASH = {"trees": {}, "details": {}}
+
+
+def mock_stash(args: dict) -> dict:
+    """离线模拟 terrain.stash：把当前树实例/植被密度存到内存 stash（同名报错）。"""
+    t = MOCK_TERRAIN
+    type_ = (args.get("type") or "all").strip().lower()
+    if type_ not in ("trees", "details", "all"):
+        raise ValueError(f"type 必须是 trees/details/all，当前: {args.get('type')}")
+    name = (args.get("name") or "").strip()
+    if not name:
+        raise ValueError("需要参数 name（stash 名称）")
+
+    result = {"terrain": t["name"], "type": type_, "name": name,
+              "treeInstances": 0, "detailLayers": 0}
+    written = []
+
+    if type_ in ("trees", "all"):
+        if name in MOCK_STASH["trees"]:
+            raise ValueError(f"同名 stash 已存在，拒绝覆盖: Assets/unity-python-bridge/stash/trees/{name}.json")
+        MOCK_STASH["trees"][name] = {
+            "type": "trees",
+            "prototypeCount": len(t["trees"]),
+            "instances": copy.deepcopy(t["tree_instances"]),
+        }
+        result["treeInstances"] = len(t["tree_instances"])
+        written.append(f"Assets/unity-python-bridge/stash/trees/{name}.json")
+
+    if type_ in ("details", "all"):
+        if name in MOCK_STASH["details"]:
+            raise ValueError(f"同名 stash 已存在，拒绝覆盖: Assets/unity-python-bridge/stash/details/{name}.json")
+        MOCK_STASH["details"][name] = {
+            "type": "details",
+            "layerCount": len(t["details"]),
+            "detailWidth": t["detailResolution"],
+            "detailHeight": t["detailResolution"],
+            "detail": copy.deepcopy(t["detail"]),
+        }
+        result["detailLayers"] = len(t["details"])
+        written.append(f"Assets/unity-python-bridge/stash/details/{name}.json")
+
+    result["path"] = ", ".join(written)
+    return result
+
+
+def mock_apply_stash(args: dict) -> dict:
+    """离线模拟 terrain.apply_stash：把内存 stash 整体写回地形。"""
+    t = MOCK_TERRAIN
+    type_ = (args.get("type") or "all").strip().lower()
+    if type_ not in ("trees", "details", "all"):
+        raise ValueError(f"type 必须是 trees/details/all，当前: {args.get('type')}")
+    name = (args.get("name") or "").strip()
+    if not name:
+        raise ValueError("需要参数 name（stash 名称）")
+
+    result = {"terrain": t["name"], "type": type_, "name": name,
+              "treeInstances": 0, "detailLayers": 0}
+    applied = []
+
+    if type_ in ("trees", "all"):
+        entry = MOCK_STASH["trees"].get(name)
+        if entry is None:
+            raise ValueError(f"stash 文件不存在（trees）: {name}.json（请先用 terrain.stash 保存）")
+        if entry["prototypeCount"] != len(t["trees"]):
+            raise ValueError(f"stash '{name}' 的树原型数({entry['prototypeCount']})与当前地形({len(t['trees'])})不一致，拒绝应用")
+        t["tree_instances"] = copy.deepcopy(entry["instances"])
+        result["treeInstances"] = len(t["tree_instances"])
+        applied.append(f"Assets/unity-python-bridge/stash/trees/{name}.json")
+
+    if type_ in ("details", "all"):
+        entry = MOCK_STASH["details"].get(name)
+        if entry is None:
+            raise ValueError(f"stash 文件不存在（details）: {name}.json（请先用 terrain.stash 保存）")
+        if entry["layerCount"] != len(t["details"]):
+            raise ValueError(f"stash '{name}' 的草原型数({entry['layerCount']})与当前地形({len(t['details'])})不一致，拒绝应用")
+        t["detail"] = copy.deepcopy(entry["detail"])
+        result["detailLayers"] = entry["layerCount"]
+        applied.append(f"Assets/unity-python-bridge/stash/details/{name}.json")
+
+    result["path"] = ", ".join(applied)
+    return result
+
+
+def mock_stash_delete(args: dict) -> dict:
+    """离线模拟 terrain.stash_delete。"""
+    type_ = (args.get("type") or "").strip().lower()
+    if type_ not in ("trees", "details"):
+        raise ValueError("stash_delete 的 type 必须是 trees 或 details（不能是 all）")
+    name = (args.get("name") or "").strip()
+    if not name:
+        raise ValueError("需要参数 name（stash 名称）")
+    if name not in MOCK_STASH[type_]:
+        raise ValueError(f"stash 文件不存在: {type_}/{name}.json")
+    del MOCK_STASH[type_][name]
+    return {"type": type_, "name": name,
+            "path": f"Assets/unity-python-bridge/stash/{type_}/{name}.json",
+            "deleted": True}
+
+
+def mock_stash_list(args: dict) -> dict:
+    """离线模拟 terrain.stash_list。"""
+    type_ = (args.get("type") or "all").strip().lower()
+    if type_ not in ("trees", "details", "all"):
+        raise ValueError(f"type 必须是 trees/details/all，当前: {args.get('type')}")
+    dirs = ["trees", "details"] if type_ == "all" else [type_]
+    entries = []
+    for d in dirs:
+        for name in sorted(MOCK_STASH[d].keys()):
+            entries.append({
+                "type": d,
+                "name": name,
+                "path": f"Assets/unity-python-bridge/stash/{d}/{name}.json",
+                "bytes": 128,  # mock 不模拟真实文件大小
+            })
+    return {"stashDir": "Assets/unity-python-bridge/stash",
+            "count": len(entries), "entries": entries}
+
+
+# ============ view.camera 模拟 ============
+
+
+def mock_view_camera(args: dict) -> dict:
+    """离线模拟 view.camera：生成占位 PNG 并回显相机名/分辨率。
+
+    真实渲染由 Unity 侧完成（把相机 targetTexture 临时指向 RT 后 cam.Render）；
+    此处仅用于在无 Unity 环境时验证 Python 客户端、参数校验与文件写出逻辑。
+    """
+    cameras = [r["name"] for r in MOCK_SCENE["roots"]
+               if any(c == "Camera" for c in r.get("components", []))]
+    if not cameras:
+        raise ValueError("场景中没有任何相机")
+
+    requested = args.get("camera")
+    if requested:
+        if requested not in cameras:
+            raise ValueError(f"未找到名为 '{requested}' 的相机（可用: {cameras}）")
+        camera = requested
+    else:
+        camera = "Main Camera" if "Main Camera" in cameras else cameras[0]
+
+    output = args.get("output", "")
+    if not output.lower().endswith(".png"):
+        raise ValueError("output 必须是 .png 文件路径")
+    width = int(args.get("width", 0)) or 1920
+    height = int(args.get("height", 0)) or 1080
+
+    out_dir = os.path.dirname(os.path.abspath(output))
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    png = make_png(width, height, bytes([20, 80, 200, 255]) * (width * height))
+    with open(output, "wb") as f:
+        f.write(png)
+
+    return {
+        "camera": camera,
+        "requestedCamera": requested,
+        "output": os.path.abspath(output),
+        "width": width,
+        "height": height,
+        "bytes": len(png),
+    }
+
+
+# ============ gameobject.get / gameobject.set 模拟 ============
+
+# path -> {"active": bool, "position": {x,y,z}, "rotationEuler": {x,y,z}, "scale": {x,y,z}}
+MOCK_GO_OVERRIDES = {}
+
+
+def _find_scene_node(target: str):
+    """在 MOCK_SCENE 中按路径/名称定位节点，返回 (node, path)。"""
+    if not target:
+        raise ValueError("gameobject 命令需要参数 target")
+
+    def find_path(roots, segs, depth):
+        for r in roots:
+            if r["name"] == segs[depth]:
+                if depth == len(segs) - 1:
+                    return r, [r["name"]]
+                child, path = find_path(r.get("children", []), segs, depth + 1)
+                if child is not None:
+                    return child, [r["name"]] + path
+        return None, None
+
+    if "/" in target:
+        segs = [s for s in target.split("/") if s]
+        node, path = find_path(MOCK_SCENE["roots"], segs, 0)
+        if node is None:
+            raise ValueError(f"场景中未找到路径 '{target}'")
+        return node, "/".join(path)
+
+    matches = []
+
+    def collect(node, prefix):
+        p = (prefix + "/" + node["name"]) if prefix else node["name"]
+        if node["name"] == target:
+            matches.append((node, p))
+        for c in node.get("children", []):
+            collect(c, p)
+
+    for r in MOCK_SCENE["roots"]:
+        collect(r, "")
+    if len(matches) == 0:
+        raise ValueError(f"场景中未找到名为 '{target}' 的物体")
+    if len(matches) > 1:
+        sample = ", ".join(m[1] for m in matches[:2])
+        raise ValueError(f"场景中有 {len(matches)} 个名为 '{target}' 的物体，请使用层级路径（如 {sample}）")
+    return matches[0]
+
+
+def _go_state(target: str) -> dict:
+    node, path = _find_scene_node(target)
+    ov = MOCK_GO_OVERRIDES.get(path, {})
+    return {
+        "target": target,
+        "resolvedPath": path,
+        "active": ov.get("active", node.get("active", True)),
+        "activeInHierarchy": ov.get("active", node.get("active", True)),
+        "position": ov.get("position", {"x": 0, "y": 0, "z": 0}),
+        "rotationEuler": ov.get("rotationEuler", {"x": 0, "y": 0, "z": 0}),
+        "quaternion": False,
+        "rotationQuat": {"x": 0, "y": 0, "z": 0, "w": 1},
+        "scale": ov.get("scale", {"x": 1, "y": 1, "z": 1}),
+    }
+
+
+def mock_go_get(args: dict) -> dict:
+    target = args.get("target", "")
+    state = _go_state(target)
+    state["quaternion"] = bool(args.get("quaternion", False))
+    return state
+
+
+def mock_go_set(args: dict) -> dict:
+    target = args.get("target", "")
+    _, path = _find_scene_node(target)
+    ov = MOCK_GO_OVERRIDES.setdefault(path, {})
+
+    if "active" in args:
+        a = int(args["active"])
+        if a not in (-1, 0, 1):
+            raise ValueError(f"active 必须是 -1(不改)/0(隐藏)/1(激活)，当前: {a}")
+        if a != -1:
+            ov["active"] = (a == 1)
+
+    if args.get("position") is not None:
+        p = args["position"]
+        if len(p) != 3:
+            raise ValueError("position 必须是 3 个分量 {x,y,z}")
+        ov["position"] = {"x": p[0], "y": p[1], "z": p[2]}
+
+    if args.get("rotation") is not None:
+        r = args["rotation"]
+        if args.get("quaternion"):
+            if len(r) != 4:
+                raise ValueError("quaternion=true 时 rotation 必须是 4 个分量 {x,y,z,w}")
+            # mock 简化：不真正做四元数→欧拉换算，位置校验与读写逻辑已验证即可
+            ov["rotationEuler"] = {"x": r[0], "y": r[1], "z": r[2]}
+        else:
+            if len(r) != 3:
+                raise ValueError("rotation 必须是 3 个分量 {x,y,z}（欧拉角）")
+            ov["rotationEuler"] = {"x": r[0], "y": r[1], "z": r[2]}
+
+    if args.get("scale") is not None:
+        s = args["scale"]
+        if len(s) != 3:
+            raise ValueError("scale 必须是 3 个分量 {x,y,z}")
+        ov["scale"] = {"x": s[0], "y": s[1], "z": s[2]}
+
+    return _go_state(target)
 
 
 def main() -> None:

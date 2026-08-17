@@ -16,8 +16,9 @@ namespace UnityPythonBridge
         ///   v1.0.0 独立重构（JsonUtility，5 条原生命令）
         ///   v1.1.0 新增 12 条 terrain.* 命令
         ///   v1.2.0 修复 list_commands 顶层 List 序列化 + 新增版本工具
+        ///   v1.3.0 新增 terrain.stash 四命令（快照 JSON）+ view.camera（抓指定相机）+ gameobject.get/set
         /// </summary>
-        public const string Version = "1.2.0";
+        public const string Version = "1.3.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

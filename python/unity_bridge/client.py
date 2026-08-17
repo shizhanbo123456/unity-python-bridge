@@ -243,6 +243,79 @@ class UnityClient:
         """返回 Terrain 所有草原型的预制体或贴图目录（去重）及各自完整路径。"""
         return self.call("terrain.get_detail_asset_dirs", terrain=terrain)
 
+    # ---- Terrain stash（stash → clear → apply 截图调整链路）----
+
+    def stash(self, terrain: str = None, type_: str = "all", name: str = "") -> dict:
+        """把当前地形的树木实例/植被密度图全量序列化为 JSON 存到工具 stash 子目录。
+
+        同名 stash 已存在时会报错（不允许覆盖，需先 stash_delete）。
+        type_ 为 "trees" / "details" / "all"。
+        """
+        return self.call("terrain.stash", terrain=terrain, type=type_, name=name)
+
+    def apply_stash(self, terrain: str = None, type_: str = "all", name: str = "") -> dict:
+        """读取 stash JSON 并整体写回地形（替换当前 trees/detail）。"""
+        return self.call("terrain.apply_stash", terrain=terrain, type=type_, name=name)
+
+    def stash_delete(self, type_: str, name: str) -> dict:
+        """删除指定 stash 文件（type 必须是 trees 或 details）。"""
+        return self.call("terrain.stash_delete", type=type_, name=name)
+
+    def stash_list(self, type_: str = "all") -> dict:
+        """列出工具 stash 子目录下所有 stash 文件。"""
+        return self.call("terrain.stash_list", type=type_)
+
+    # ---- view.camera（抓取指定相机实时画面）----
+
+    def view_screenshot(self, output: str, camera: str = None,
+                        width: int = 0, height: int = 0) -> dict:
+        """渲染指定相机的实时画面保存为 PNG（默认 MainCamera）。
+
+        camera 省略时 Unity 侧依次找 tag=MainCamera、名为 Main Camera 的、第一个激活相机。
+        width/height 为 0 时使用相机当前分辨率。
+        """
+        args = {"output": output}
+        if camera:
+            args["camera"] = camera
+        if width > 0:
+            args["width"] = width
+        if height > 0:
+            args["height"] = height
+        return self.call("view.camera", **args)
+
+    # ---- gameobject.get / gameobject.set（常规物体操作）----
+
+    def gameobject_get(self, target: str, quaternion: bool = False) -> dict:
+        """读取 GameObject 的 active 状态与 Transform 的 position/rotation/scale。
+
+        target 为层级路径（如 "Player/Body"）或唯一名称；rotation 默认欧拉角，
+        quaternion=True 时额外返回四元数。
+        """
+        return self.call("gameobject.get", target=target, quaternion=quaternion)
+
+    def gameobject_set(self, target: str, active: int = -1, position=None,
+                       rotation=None, scale=None, quaternion: bool = False) -> dict:
+        """写入 GameObject 的 active 状态与 Transform 的 position/rotation/scale。
+
+        active: -1 不改 / 0 隐藏 / 1 激活。
+        position: [x, y, z] 世界坐标，None 不改。
+        rotation: 默认 [x, y, z] 欧拉角；quaternion=True 时 [x, y, z, w] 四元数，None 不改。
+        scale: [x, y, z] localScale，None 不改。
+        返回设置后的完整状态。
+        """
+        args = {"target": target}
+        if active != -1:
+            args["active"] = active
+        if position is not None:
+            args["position"] = list(position)
+        if rotation is not None:
+            args["rotation"] = list(rotation)
+        if scale is not None:
+            args["scale"] = list(scale)
+        if quaternion:
+            args["quaternion"] = True
+        return self.call("gameobject.set", **args)
+
     # ---- 内部 ----
 
     def _ensure_connected(self) -> None:

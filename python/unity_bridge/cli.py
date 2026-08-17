@@ -226,6 +226,76 @@ def _cmd_screenshot(args) -> int:
     return 0
 
 
+def _cmd_view_screenshot(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.view_screenshot(output=args.output, camera=args.camera,
+                                      width=args.width, height=args.height)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"camera : {data.get('camera')}" + (f"  (requested: {data.get('requestedCamera')})" if data.get("requestedCamera") else ""))
+    print(f"output : {data.get('output')}")
+    print(f"size   : {data.get('width')}x{data.get('height')}")
+    print(f"bytes  : {data.get('bytes')}")
+    return 0
+
+
+def _cmd_gameobject_get(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.gameobject_get(args.target, quaternion=args.quaternion)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_go_state(data)
+    return 0
+
+
+def _cmd_gameobject_set(args) -> int:
+    def _vec3(s: str):
+        parts = [float(x) for x in s.replace(",", " ").split()]
+        if len(parts) != 3:
+            raise ValueError("需要 3 个分量，格式 'x,y,z'")
+        return parts
+
+    position = _vec3(args.position) if args.position else None
+    scale = _vec3(args.scale) if args.scale else None
+    rotation = None
+    if args.rotation:
+        parts = [float(x) for x in args.rotation.replace(",", " ").split()]
+        if args.quaternion and len(parts) != 4:
+            print("[错误] --quaternion 时 --rotation 需要 4 个分量 {x,y,z,w}", file=sys.stderr)
+            return 1
+        if not args.quaternion and len(parts) != 3:
+            print("[错误] --rotation 需要 3 个分量 {x,y,z}（欧拉角）", file=sys.stderr)
+            return 1
+        rotation = parts
+
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.gameobject_set(
+            args.target, active=args.active, position=position,
+            rotation=rotation, scale=scale, quaternion=args.quaternion)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_go_state(data)
+    return 0
+
+
+def _print_go_state(data: dict) -> None:
+    p = data.get("position", {})
+    r = data.get("rotationEuler", {})
+    s = data.get("scale", {})
+    print(f"target : {data.get('target')}  ->  path: {data.get('resolvedPath')}")
+    print(f"active : {data.get('active')}  (activeInHierarchy: {data.get('activeInHierarchy')})")
+    print(f"pos    : ({p.get('x')}, {p.get('y')}, {p.get('z')})")
+    if data.get("quaternion"):
+        q = data.get("rotationQuat", {})
+        print(f"rot    : quat({q.get('x')}, {q.get('y')}, {q.get('z')}, {q.get('w')})  euler({r.get('x')}, {r.get('y')}, {r.get('z')})")
+    else:
+        print(f"rot    : euler({r.get('x')}, {r.get('y')}, {r.get('z')})")
+    print(f"scale  : ({s.get('x')}, {s.get('y')}, {s.get('z')})")
+
+
 # ============ Terrain 程序化编辑命令 ============
 
 
@@ -489,6 +559,53 @@ def _cmd_terrain_clear_trees(args) -> int:
     return 0
 
 
+def _cmd_terrain_stash(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.stash(args.terrain, type_=args.type, name=args.name)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  type={data.get('type')}  name={data.get('name')}")
+    print(f"path   : {data.get('path')}")
+    print(f"trees  : {data.get('treeInstances')}  detailLayers={data.get('detailLayers')}")
+    return 0
+
+
+def _cmd_terrain_apply_stash(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.apply_stash(args.terrain, type_=args.type, name=args.name)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"terrain: {data.get('terrain')}  type={data.get('type')}  name={data.get('name')}")
+    print(f"path   : {data.get('path')}")
+    print(f"trees  : {data.get('treeInstances')}  detailLayers={data.get('detailLayers')}")
+    return 0
+
+
+def _cmd_terrain_stash_delete(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.stash_delete(args.type, args.name)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"type   : {data.get('type')}  name={data.get('name')}  deleted={data.get('deleted')}")
+    print(f"path   : {data.get('path')}")
+    return 0
+
+
+def _cmd_terrain_stash_list(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.stash_list(args.type)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"stashDir: {data.get('stashDir')}  count={data.get('count')}")
+    for e in data.get("entries", []):
+        print(f"  [{e.get('type'):<7}] {e.get('name'):<24} {e.get('bytes')}B  {e.get('path')}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="unity-bridge",
@@ -567,6 +684,39 @@ def build_parser() -> argparse.ArgumentParser:
                         help="补光强度（默认 0 不补光；>0 时追加与相机同向平行光，推荐 2）")
     p_shot.add_argument("--json", action="store_true", help="输出原始 JSON 而非文本")
     p_shot.set_defaults(func=_cmd_screenshot)
+
+    p_vshot = sub.add_parser(
+        "view-screenshot", aliases=["vshot"],
+        help="渲染指定相机的实时画面保存为 PNG（默认 MainCamera；区别于 screenshot 的隔离渲染）")
+    p_vshot.add_argument("output", help="PNG 输出路径（必须以 .png 结尾）")
+    p_vshot.add_argument("--camera", default=None,
+                        help="相机 GameObject 名称（省略时依次找 MainCamera / Main Camera / 第一个激活相机）")
+    p_vshot.add_argument("--width", type=int, default=0, help="输出图片宽（默认相机当前分辨率）")
+    p_vshot.add_argument("--height", type=int, default=0, help="输出图片高（默认相机当前分辨率）")
+    p_vshot.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_vshot.set_defaults(func=_cmd_view_screenshot)
+
+    p_gget = sub.add_parser(
+        "gameobject-get", aliases=["gget"],
+        help="读取 GameObject 的 active 状态与 Transform 的 position/rotation/scale")
+    p_gget.add_argument("target", help="层级路径（如 Player/Body）优先，名称兼容（重名报错）")
+    p_gget.add_argument("--quaternion", action="store_true", help="同时输出四元数（默认只输出欧拉角）")
+    p_gget.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_gget.set_defaults(func=_cmd_gameobject_get)
+
+    p_gset = sub.add_parser(
+        "gameobject-set", aliases=["gset"],
+        help="写入 GameObject 的 active 状态与 Transform 的 position/rotation/scale（支持 Undo）")
+    p_gset.add_argument("target", help="层级路径（如 Player/Body）优先，名称兼容（重名报错）")
+    p_gset.add_argument("--active", type=int, default=-1,
+                        help="0=隐藏 1=激活（默认 -1 不改）")
+    p_gset.add_argument("--position", default=None, help="世界坐标 'x,y,z'")
+    p_gset.add_argument("--rotation", default=None,
+                        help="欧拉角 'x,y,z'；--quaternion 时四元数 'x,y,z,w'")
+    p_gset.add_argument("--scale", default=None, help="localScale 'x,y,z'")
+    p_gset.add_argument("--quaternion", action="store_true", help="rotation 按四元数输入/输出")
+    p_gset.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_gset.set_defaults(func=_cmd_gameobject_set)
 
     # ============ Terrain 程序化编辑 ============
 
@@ -706,6 +856,41 @@ def build_parser() -> argparse.ArgumentParser:
     p_ttclear.add_argument("--terrain", default=None)
     p_ttclear.add_argument("--json", action="store_true")
     p_ttclear.set_defaults(func=_cmd_terrain_clear_trees)
+
+    # ============ Terrain stash（stash → clear → apply 截图调整链路）============
+
+    p_tstash = sub.add_parser("terrain-stash", aliases=["tstash"],
+                              help="把当前地形的树木/植被全量序列化为 JSON 存到工具 stash 子目录（同名报错）")
+    p_tstash.add_argument("--terrain", default=None)
+    p_tstash.add_argument("--type", default="all", choices=["trees", "details", "all"],
+                          help="存储类型（默认 all）")
+    p_tstash.add_argument("--name", required=True, help="stash 名称（不含扩展名，如 forest_v1）")
+    p_tstash.add_argument("--json", action="store_true")
+    p_tstash.set_defaults(func=_cmd_terrain_stash)
+
+    p_tapply = sub.add_parser("terrain-apply-stash", aliases=["tapply"],
+                              help="读取 stash JSON 并整体写回地形（替换当前 trees/detail）")
+    p_tapply.add_argument("--terrain", default=None)
+    p_tapply.add_argument("--type", default="all", choices=["trees", "details", "all"],
+                          help="应用类型（默认 all）")
+    p_tapply.add_argument("--name", required=True, help="stash 名称（不含扩展名）")
+    p_tapply.add_argument("--json", action="store_true")
+    p_tapply.set_defaults(func=_cmd_terrain_apply_stash)
+
+    p_tstashdel = sub.add_parser("terrain-stash-delete", aliases=["tstashdel"],
+                                 help="删除指定 stash 文件")
+    p_tstashdel.add_argument("--type", required=True, choices=["trees", "details"],
+                             help="stash 类型（trees 或 details）")
+    p_tstashdel.add_argument("--name", required=True, help="stash 名称（不含扩展名）")
+    p_tstashdel.add_argument("--json", action="store_true")
+    p_tstashdel.set_defaults(func=_cmd_terrain_stash_delete)
+
+    p_tstashlist = sub.add_parser("terrain-stash-list", aliases=["tstashlist"],
+                                  help="列出工具 stash 子目录下所有 stash 文件")
+    p_tstashlist.add_argument("--type", default="all", choices=["trees", "details", "all"],
+                              help="筛选类型（默认 all）")
+    p_tstashlist.add_argument("--json", action="store_true")
+    p_tstashlist.set_defaults(func=_cmd_terrain_stash_list)
 
     return parser
 
