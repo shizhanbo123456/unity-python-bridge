@@ -106,7 +106,7 @@ python -m unity_bridge tree --components
 
 ---
 
-## 三、命令总览（32 条：7 基础 + 3 调试 + 19 Terrain + 1 视图 + 2 物体）
+## 三、命令总览（33 条：7 基础 + 4 调试 + 19 Terrain + 1 视图 + 2 物体）
 
 ### A. 基础命令（7 条）
 
@@ -120,13 +120,14 @@ python -m unity_bridge tree --components
 | `bridge.version` | 系统 | 返回桥接层版本号与命令统计，确认 Unity 侧代码是否为最新 | `version`（`ver`/`v`） | 无 |
 | `bridge.reload` | 系统 | 触发 Unity 脚本重编译（domain reload），编译完成后服务器自动恢复 | `reload`（`rl`） | `--expect-version`、`--timeout`、`--interval` |
 
-### A2. 调试命令（3 条）
+### A2. 调试命令（4 条）
 
 | 命令 (bus name) | 功能 | Python CLI | 关键参数 |
 |---|---|---|---|
 | `debug.log` | 在 Unity Console 打印一条 Info 日志 | `debug-log`（`dlog`） | `message` |
 | `debug.log_warning` | 在 Unity Console 打印一条 Warning 日志 | `debug-log-warning`（`dlogw`） | `message` |
 | `debug.log_error` | 在 Unity Console 打印一条 Error 日志 | `debug-log-error`（`dloge`） | `message` |
+| `debug.get_logs` | 读取最近 N 条 Console 日志（自订阅时刻起的环形缓冲，上限 500，可按类型过滤） | `debug-logs`（`dlogs`） | `--count`（默认 50）、`--type`（all/log/warning/error/exception） |
 
 ### A3. 视图与物体操作命令（3 条）
 
@@ -169,7 +170,7 @@ python -m unity_bridge gset "Player/Body" --rotation "0,0.7071,0,0.7071" --quate
 > **坐标约定**：`position`=世界坐标；`rotation` 默认世界欧拉角、`quaternion=true` 时用四元数
 > （读与写一致）；`scale`=localScale（世界缩放只读，写入只能走本地缩放）。
 
-> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询。当前版本 **v1.3.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具 / v1.3.0=新增 terrain stash 四命令、view.camera、gameobject.get/set；debug 命令、reload、Flush 驱动等改动保持原版本号）。
+> **版本确认**：Unity 侧菜单 **Tools → Unity Python Bridge → 打印版本信息** 会在 Console 输出版本号与命令统计；也可用 `python -m unity_bridge version` 远程查询。当前版本 **v1.4.0**（v1.0.0=独立重构 / v1.1.0=新增 terrain 命令 / v1.2.0=修复 list_commands 序列化 + 版本工具 / v1.3.0=新增 terrain stash 四命令、view.camera、gameobject.get/set / v1.4.0=新增 debug.get_logs 读取 Console 日志；reload、Flush 驱动等改动保持原版本号）。
 
 **触发重编译并等待恢复**：
 
@@ -507,7 +508,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │       ├── ViewScreenshotCommand.cs # 命令 view.camera（抓取指定相机实时画面；预留 view.window）
 │       ├── GameObjectCommands.cs   # 命令 gameobject.get / gameobject.set（active/position/rotation/scale）
 │       ├── SystemCommands.cs       # bridge.ping / bridge.list_commands / bridge.version / bridge.reload
-│       └── DebugCommands.cs        # debug.log / debug.log_warning / debug.log_error
+│       └── DebugCommands.cs        # debug.log / debug.log_warning / debug.log_error / debug.get_logs
 └── python/                         # Python 侧（无需安装依赖）
     ├── unity_bridge/
     │   ├── __init__.py

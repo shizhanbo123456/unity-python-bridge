@@ -24,7 +24,8 @@ namespace UnityPythonBridge
         // ---- scene.tree ----
         public bool components;
 
-        // ---- debug.log / debug.log_warning / debug.log_error ----
+        // ---- debug.log / debug.log_warning / debug.log_error / debug.get_logs ----
+        // 注意：count 复用下方 terrain 段的同名字段（均表示"数量"），勿重复声明
         public string message;
 
         // ---- mesh.bounds / prefab.screenshot ----
@@ -60,7 +61,7 @@ namespace UnityPythonBridge
         // ---- terrain 植被 / 树木 ----
         public int layer;
         public int prototypeIndex;  // 树原型索引（terrain.add_trees 使用）
-        public int count;
+        public int count;           // 数量：terrain.set_details/add_trees 的随机数量；debug.get_logs 的返回条数
         public int seed;
         public int density;
         public float minScale;

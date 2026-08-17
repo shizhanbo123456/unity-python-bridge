@@ -110,6 +110,14 @@ class UnityClient:
         """在 Unity Console 打印一条 Error 日志。"""
         return self.call("debug.log_error", message=message)
 
+    def get_logs(self, count: int = 50, type_: str = "all") -> dict:
+        """读取最近 N 条 Console 日志（自订阅时刻起缓存的环形缓冲，上限 500）。
+
+        type_ 为 "all" / "log" / "warning" / "error" / "exception"。
+        返回 {"count": n, "entries": [{index, time, type, message, stackTrace}, ...]}。
+        """
+        return self.call("debug.get_logs", count=count, type=type_)
+
     def scene_tree(self, components: bool = False) -> dict:
         return self.call("scene.tree", components=components)
 

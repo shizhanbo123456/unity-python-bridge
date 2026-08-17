@@ -160,6 +160,18 @@ def _cmd_debug_log_error(args) -> int:
     return 0
 
 
+def _cmd_debug_logs(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.get_logs(count=args.count, type_=args.type)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"count: {data.get('count')}  (type={args.type}, 最近 {args.count} 条内)")
+    for e in data.get("entries", []):
+        print(f"  [{e.get('index'):>3}] {e.get('type'):<9} t={e.get('time', 0):8.3f}s  {e.get('message')}")
+    return 0
+
+
 def _cmd_mesh_bounds(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.mesh_bounds(args.path)
@@ -658,6 +670,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_dbge.add_argument("message", help="日志内容")
     p_dbge.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_dbge.set_defaults(func=_cmd_debug_log_error)
+
+    p_dbglogs = sub.add_parser("debug-logs", aliases=["dlogs"],
+                               help="读取最近 N 条 Console 日志（环形缓冲，可按类型过滤）")
+    p_dbglogs.add_argument("--count", type=int, default=50,
+                           help="返回条数（默认 50，上限为缓冲容量 500）")
+    p_dbglogs.add_argument("--type", default="all",
+                           choices=["all", "log", "warning", "error", "exception"],
+                           help="按类型过滤（默认 all）")
+    p_dbglogs.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_dbglogs.set_defaults(func=_cmd_debug_logs)
 
     p_bounds = sub.add_parser(
         "mesh-bounds", aliases=["bounds"],

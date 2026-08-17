@@ -58,6 +58,7 @@ COMMANDS = [
     {"name": "debug.log", "description": "在 Unity Console 打印一条 Info 日志。参数: message(string)"},
     {"name": "debug.log_warning", "description": "在 Unity Console 打印一条 Warning 日志。参数: message(string)"},
     {"name": "debug.log_error", "description": "在 Unity Console 打印一条 Error 日志。参数: message(string)"},
+    {"name": "debug.get_logs", "description": "读取最近 N 条 Console 日志（环形缓冲）。参数: count(int,可选,默认50), type(string,可选 all/log/warning/error/exception)"},
     {"name": "scene.tree", "description": "以树状结构返回当前场景中的物体层级。参数: components(bool)"},
     {"name": "mesh.bounds", "description": "计算 Assets 中网格/模型/预制体的轴对齐包围盒。参数: path(string)"},
     {"name": "prefab.screenshot", "description": "将预制体复制到场景隔离位置并截图保存为 PNG（旋转保持资产原有，摄制后销毁临时对象）。参数: path(string), offset{x,y,z}, output(string,.png), orthographic(bool), fov(number), width(int), height(int), bg(string)"},
@@ -132,7 +133,7 @@ def handle_client(client: socket.socket) -> None:
                 if cmd == "bridge.ping":
                     data = {"pong": True, "time": "2026-08-15T10:00:00Z"}
                 elif cmd == "bridge.version":
-                    data = {"version": "1.3.0", "commandCount": len(COMMANDS),
+                    data = {"version": "1.4.0", "commandCount": len(COMMANDS),
                             "terrainCommandCount": sum(1 for c in COMMANDS if c["name"].startswith("terrain."))}
                 elif cmd == "bridge.reload":
                     data = {"requested": True,
@@ -141,9 +142,15 @@ def handle_client(client: socket.socket) -> None:
                     level = {"debug.log": "info",
                              "debug.log_warning": "warning",
                              "debug.log_error": "error"}[cmd]
+                    mock_append_log({"debug.log": "log",
+                                     "debug.log_warning": "warning",
+                                     "debug.log_error": "error"}[cmd],
+                                    args.get("message", ""))
                     data = {"level": level,
                             "message": args.get("message", ""),
                             "logged": True}
+                elif cmd == "debug.get_logs":
+                    data = mock_get_logs(args)
                 elif cmd == "bridge.list_commands":
                     data = {"count": len(COMMANDS), "commands": COMMANDS}
                 elif cmd == "scene.tree":
@@ -212,6 +219,32 @@ def strip_components(node) -> None:
     node.pop("components", None)
     for child in node.get("children", []):
         strip_components(child)
+
+
+# ============ debug.get_logs 模拟（内存环形缓冲，复刻 C# 侧行为）============
+
+MOCK_LOGS = []  # [{index, time, type, message, stackTrace}]
+MOCK_LOG_MAX = 500
+
+
+def mock_append_log(type_: str, message: str) -> None:
+    """把一条日志加入缓冲（模拟 Unity 的 Application.logMessageReceived 回调）。"""
+    entry = {"index": len(MOCK_LOGS), "time": 0.0,
+             "type": type_, "message": message, "stackTrace": ""}
+    MOCK_LOGS.append(entry)
+    if len(MOCK_LOGS) > MOCK_LOG_MAX:
+        del MOCK_LOGS[:len(MOCK_LOGS) - MOCK_LOG_MAX]
+
+
+def mock_get_logs(args: dict) -> dict:
+    """离线模拟 debug.get_logs：按 count 取最近、按 type 过滤。"""
+    count = int(args.get("count", 50)) or 50
+    filter_ = (args.get("type") or "all").strip().lower()
+    if filter_ not in ("all", "log", "warning", "error", "exception"):
+        raise ValueError(f"type 必须是 all/log/warning/error/exception，当前: {filter_}")
+    recent = MOCK_LOGS[-count:]
+    entries = [e for e in recent if filter_ == "all" or e["type"] == filter_]
+    return {"count": len(entries), "entries": entries}
 
 
 def _png_chunk(tag: bytes, data: bytes) -> bytes:
