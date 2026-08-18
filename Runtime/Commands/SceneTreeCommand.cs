@@ -1,6 +1,7 @@
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Text;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -17,7 +18,9 @@ namespace UnityPythonBridge.Commands
     /// 参数:
     ///   components (bool, 可选) - 为 true 时每个节点附带组件类型列表
     /// 返回（JSON 文本）:
-    ///   { type, name, path, buildIndex, rootCount, roots: [ { name, active, components?, children: [...] } ] }
+    ///   { type, name, path, buildIndex, rootCount, roots: [ { name, active, components?, prefab?, children: [...] } ] }
+    ///
+    /// prefab 实例根节点不展开内部结构，附加 "prefab" 字段为资产路径（Assets/...）。
     /// </summary>
     public static class SceneTreeCommand
     {
@@ -182,7 +185,8 @@ namespace UnityPythonBridge.Commands
             return fallback;
         }
 
-        /// <summary>递归构建单个节点 JSON（无深度限制）。</summary>
+        /// <summary>递归构建单个节点 JSON（无深度限制）。prefab 实例根不展开内部结构，
+        /// 改为附加 prefab 资产路径（Assets/...，见 "prefab" 字段）。</summary>
         private static void AppendNode(StringBuilder sb, Transform t, bool withComponents)
         {
             var go = t.gameObject;
@@ -201,6 +205,17 @@ namespace UnityPythonBridge.Commands
                     sb.Append(JsonString(c.GetType().Name));
                 }
                 sb.Append(']');
+            }
+
+            // prefab 实例根：不进入内部遍历，备注资产路径（Assets/...）
+            // 注：不用 GetOutermostPrefabInstanceRoot == t 判断——实测该 API 返回的 Transform
+            // 与场景实例根做 == 比较为 False（对象引用不一致），应使用 IsAnyPrefabInstanceRoot。
+            if (PrefabUtility.IsAnyPrefabInstanceRoot(go))
+            {
+                string assetPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(go) ?? "";
+                sb.Append(",\"prefab\":").Append(JsonString(assetPath));
+                sb.Append(",\"children\":[]}");
+                return;
             }
 
             sb.Append(",\"children\":[");

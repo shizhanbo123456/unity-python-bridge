@@ -24,8 +24,9 @@ namespace UnityPythonBridge
         ///   v1.8.0 prefab.screenshot 支持直接指定相机位置与观察目标（世界/相对）
         ///   v1.9.0 新增 scene.important_scripts（列出挂有 Manager/Tool 等后缀脚本的物体，
         ///          匹配规则来自 bridge.ini [scene] important_suffix）
+        ///   v1.10.0 scene.tree 遇到 prefab 实例根不再展开内部，改为备注 prefab 资产路径（Assets/...）
         /// </summary>
-        public const string Version = "1.9.0";
+        public const string Version = "1.10.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

@@ -46,6 +46,8 @@ def _format_label(node: dict) -> str:
     label = node.get("name", "?")
     if not node.get("active", True):
         label += " (inactive)"
+    if node.get("prefab"):
+        label += f"  (prefab: {node['prefab']})"
     if node.get("components"):
         label += "  [" + ", ".join(node["components"]) + "]"
     return label
