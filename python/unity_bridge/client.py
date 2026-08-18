@@ -152,8 +152,13 @@ class UnityClient:
         """
         return self.call("scene.important_scripts")
 
-    def mesh_bounds(self, path: str) -> dict:
-        return self.call("mesh.bounds", path=path)
+    def mesh_bounds(self, path: str, placed: bool = False) -> dict:
+        """计算 Assets 中网格/模型/预制体的轴对齐包围盒。
+
+        placed=False（默认）：根旋转重置为 identity，得到建模原始姿态的包围盒。
+        placed=True：保持 prefab 资产原有旋转（与 prefab.screenshot 视觉姿态一致）。
+        """
+        return self.call("mesh.bounds", path=path, placed=placed)
 
     def prefab_screenshot(self, path: str, offset: dict, output: str,
                           orthographic: bool = False, fov=None,

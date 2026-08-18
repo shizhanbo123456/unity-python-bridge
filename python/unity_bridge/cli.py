@@ -218,7 +218,7 @@ def _cmd_debug_log_version(args) -> int:
 
 def _cmd_mesh_bounds(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
-        data = client.mesh_bounds(args.path)
+        data = client.mesh_bounds(args.path, placed=args.placed)
 
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
@@ -786,6 +786,8 @@ def build_parser() -> argparse.ArgumentParser:
         "mesh-bounds", aliases=["bounds"],
         help="计算 Assets 中网格/模型/预制体的轴对齐包围盒")
     p_bounds.add_argument("path", help="目标在 Assets 中的相对路径（.mesh / 模型文件 / .prefab）")
+    p_bounds.add_argument("--placed", action="store_true",
+                          help="保持 prefab 资产原有旋转计算 AABB（默认 false=建模原始姿态）")
     p_bounds.add_argument("--json", action="store_true", help="输出原始 JSON 而非文本")
     p_bounds.set_defaults(func=_cmd_mesh_bounds)
 

@@ -24,11 +24,15 @@ namespace UnityPythonBridge.Commands
     /// 参数:
     ///   path (string) - 目标在 Assets 中的相对路径（可带或不带 "Assets/" 前缀），
     ///                    支持 .mesh（网格）、.fbx/.obj/.blend 等（模型）、.prefab（预制体）。
+    ///   placed (bool) - 仅对 prefab 有效：true=保持 prefab 资产原有旋转计算 AABB
+    ///                    （与 prefab.screenshot 的视觉姿态一致），false（默认）=根旋转
+    ///                    重置为 identity，得到建模原始姿态的包围盒。
     /// 返回结构:
     ///   { path, resolvedPath, type, min{x,y,z}, max{x,y,z}, center{x,y,z}, size{x,y,z}, format }
     /// 说明:
-    ///   - 预制体/模型：实例化到原点（根变换重置为 identity，取几何固有范围），
-    ///     合并其下所有 MeshRenderer 与 SkinnedMeshRenderer 的包围盒。
+    ///   - 预制体/模型：实例化到原点（位置归零；placed=false 时根旋转/缩放重置为
+    ///     identity/one，placed=true 时保持根旋转），合并其下所有 MeshRenderer 与
+    ///     SkinnedMeshRenderer 的包围盒。
     ///   - 网格（.mesh）：取 mesh.bounds（物体局部空间）。
     ///   - 含多个网格时，返回能包围所有网格的合并包围盒。
     ///   - 坐标格式形如 "x:-2~6, y:-0.5~2, z:1~6"（见 format 字段）。
@@ -36,7 +40,7 @@ namespace UnityPythonBridge.Commands
     public static class MeshBoundsCommand
     {
         [BridgeCommand("mesh.bounds",
-            "计算 Assets 中网格/模型/预制体的轴对齐包围盒。参数: path(string, Assets 相对路径)")]
+            "计算 Assets 中网格/模型/预制体的轴对齐包围盒。参数: path(string, Assets 相对路径), placed(bool, 默认false; true=保持prefab原有旋转)")]
         public static object Bounds(BridgeContext ctx, BridgeArgs args)
         {
             var path = args.path;
@@ -51,7 +55,7 @@ namespace UnityPythonBridge.Commands
             if (go != null)
             {
                 var type = ext == ".prefab" ? "prefab" : "model";
-                var bounds = ComputeGameObjectBounds(go);
+                var bounds = ComputeGameObjectBounds(go, args.placed);
                 return BuildResult(path, assetPath, type, bounds);
             }
 
@@ -76,13 +80,16 @@ namespace UnityPythonBridge.Commands
 
         /// <summary>
         /// 实例化预制体/模型到原点，合并其下所有网格渲染器的世界包围盒。
-        /// 根变换重置为 identity，得到与"摆放在原点"一致的几何固有范围。
+        /// 位置归零；keepRotation=false 时根旋转重置为 identity（建模原始姿态），
+        /// true 时保持 prefab 资产原有旋转（与截图/实际摆放的视觉姿态一致）；
+        /// 缩放统一为 1（只看几何本身）。
         /// </summary>
-        private static Bounds ComputeGameObjectBounds(GameObject prefab)
+        private static Bounds ComputeGameObjectBounds(GameObject prefab, bool keepRotation)
         {
             var instance = GameObject.Instantiate(prefab);
             instance.transform.position = Vector3.zero;
-            instance.transform.rotation = Quaternion.identity;
+            if (!keepRotation)
+                instance.transform.rotation = Quaternion.identity;
             instance.transform.localScale = Vector3.one;
 
             Bounds? combined = null;

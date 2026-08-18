@@ -34,6 +34,8 @@ namespace UnityPythonBridge
         // 注意：path 被多命令复用——mesh.bounds/prefab.screenshot 解释为 Assets 资产路径，
         // scene.tree 解释为扫描起点（层级路径或唯一名称），各自命令自行解释，勿重复声明
         public string path;
+        /// <summary>mesh.bounds：是否保持 prefab 资产原有旋转计算 AABB（默认 false=根旋转重置 identity，得到建模原始姿态）。</summary>
+        public bool placed;
         public string output;
         public Vector3 offset;
         /// <summary>prefab.screenshot：相机世界坐标（float[] 3）；relative=true 时解释为相对预制体位置。缺省回退 offset。</summary>
