@@ -78,6 +78,15 @@ Unity 检测到 Assets 下 C# 变化会自动编译，但**失焦时会暂停**�
 **D6. 服务器重复启动/停止没有反应？**
 v1.7.0+ 会打印 Warning：已运行再「启动」→「服务器已在运行中…」；未运行再「停止」→「服务器未在运行…」。看到 Warning 说明操作被正确拦截，不是 bug。
 
+**D7. `tree --path` 报「不能直接扫描 prefab 实例内部」？**
+设计如此（v1.11.0+）：`--path` 不允许指向 prefab 实例内部的物体，报错信息会给出 **prefab 根在场景中的路径**和 **Assets 中 prefab 的路径**，从 prefab 根或场景根开始扫描即可。起点就是 prefab 实例根（如 `Tree_A_1`）则允许，节点会显示 prefab 资产路径标注。
+
+**D8. `tree --path` / `prefab-tree` 里物体名带空格匹配不到？**
+prefab 资产内部物体名可能带首尾空格（如 `Tree_A_1.prefab` 里的子物体实际叫 `'Cylinder '`）。路径匹配已按 **Trim 后比较**处理（v1.11.0+），输入 `Tree_A_1/Cylinder` 即可命中；`--json` 输出的 `name` 保留原始名称（含空格），属正常。
+
+**D9. `prefab.tree` 与 `scene.tree` 的 `--depth` 默认值不同？**
+是的：`scene.tree` 默认 1（只显示起点本身，场景根通常够用）；`prefab.tree` 默认 `-1`（完整展开，因为该工具定位就是看 prefab 内部结构）。需要限制层级时显式传 `--depth N`。
+
 ## E. 环境与维护
 
 **E1. Python 需要装包吗？**

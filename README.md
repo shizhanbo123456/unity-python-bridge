@@ -164,7 +164,7 @@ important_suffix = Manager, Tool  ; scene.important_scripts 的重要脚本匹�
 python -m unity_bridge reload
 
 # 指定期望版本（不匹配则继续等待）、自定义超时与轮询间隔
-python -m unity_bridge reload --expect-version 1.8.0 --timeout 180 --interval 2
+python -m unity_bridge reload --expect-version 1.12.0 --timeout 180 --interval 2
 ```
 
 - **原理**：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `CompilationPipeline.RequestScriptCompilation()` 触发重编译；重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。

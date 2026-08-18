@@ -17,6 +17,7 @@
 ## 2. 这个工具能做什么（一分钟速览）
 
 - **命令行操控 Unity 编辑器**：读场景结构、查资产、算包围盒、截图
+- **场景与 Prefab 层级查看**：`scene.tree` 树状看场景（prefab 实例折叠并标注资产路径，支持深度/起点）；`prefab.tree` 直接看 prefab 资产内部层级；`scene.important_scripts` 一键列出挂有 Manager/Tool 等重要脚本的物体
 - **地形程序化生成**：造山（噪声）、铺纹理、撒植被、种树，一条命令完成
 - **地形快照**：把树木/植被存成 JSON，随时恢复（stash → clear → 截图 → apply）
 - **日志与调试**：往 Console 打日志、读回最近日志（含报错堆栈）
@@ -41,7 +42,7 @@ python -m unity_bridge list         # 命令数=36 = 注册完整 ✓
 | 症状 | 原因 | 处理 |
 |---|---|---|
 | 「无法连接 Unity（127.0.0.1:21927）」 | 服务器没启动 / 端口不一致 / Unity 关了 | 菜单 Start Server；检查 `bridge.ini` 端口与 `--port` 是否一致 |
-| 连上了但命令报「未知命令」 | Unity 侧代码比 Python 侧旧 | `reload --expect-version 1.8.0` 让两侧同步 |
+| 连上了但命令报「未知命令」 | Unity 侧代码比 Python 侧旧 | `reload --expect-version <当前版本号>` 让两侧同步 |
 | 端口被占用 | 多项目共用默认 21927 | 改 `bridge.ini` 的 `[server] port`（两侧自动读取） |
 | reload 一直等待/超时 | **Unity 窗口不在前台**（失焦时 update 不运行） | 把 Unity 窗口切到前台再 reload |
 
@@ -61,7 +62,7 @@ python -m unity_bridge list         # 命令数=36 = 注册完整 ✓
 
 | 类型 | 命令 | 影响 |
 |---|---|---|
-| **只读** | `tree` / `bounds` / `terrain-list` / `get_*` / `dlogs` / `version` 等 | 不改变任何东西 |
+| **只读** | `tree` / `prefab-tree` / `important-scripts` / `bounds` / `terrain-list` / `get_*` / `dlogs` / `version` 等 | 不改变任何东西 |
 | **改场景（可保存）** | `terrain.set_*` / `add_trees` / `clear_trees` / `apply_stash` | 立即生效并标记 dirty，需 Ctrl+S；写入会自动重建地形碰撞体 |
 | **改物体（支持 Undo）** | `gameobject.set` | 编辑器内可 Ctrl+Z 撤销 |
 | **临时隔离（用完销毁）** | `prefab.screenshot` | 复制到 9999 坐标渲染，结束后销毁临时对象，不污染场景 |

@@ -142,8 +142,17 @@ python -m unity_bridge view-screenshot out/clean.png
 python -m unity_bridge terrain-apply-stash --name forest_v1 --type all  # 恢复
 ```
 
+### 查看层级结构（场景 / Prefab 资产）
+```bash
+python -m unity_bridge tree                                   # 场景树（默认 depth=1 只显示根；prefab 实例折叠标注资产路径）
+python -m unity_bridge tree --depth 3 --components            # 展开到第 3 层并带组件
+python -m unity_bridge tree --path "MainCamera/Object1"       # 只从指定物体开始扫描（prefab 实例内部会报错并给出 prefab 位置）
+python -m unity_bridge important-scripts                      # 列出场景中挂有 Manager/Tool 等后缀脚本的物体
+python -m unity_bridge prefab-tree Assets/Prefabs/Tree.prefab # 直接查看 prefab 资产内部层级（path 必填，默认完整展开）
+```
+
 ### 自诊断（日志读回 + 重编译）
 ```bash
 python -m unity_bridge debug-logs --type error --count 20   # 读最近 20 条错误（含 stackTrace）
-python -m unity_bridge reload --expect-version 1.8.0        # 改完 C# 后触发重编译并等待恢复
+python -m unity_bridge reload --expect-version 1.12.0        # 改完 C# 后触发重编译并等待恢复
 ```
