@@ -87,6 +87,9 @@ prefab 资产内部物体名可能带首尾空格（如 `Tree_A_1.prefab` 里的
 **D9. `prefab.tree` 与 `scene.tree` 的 `--depth` 默认值不同？**
 是的：`scene.tree` 默认 1（只显示起点本身，场景根通常够用）；`prefab.tree` 默认 `-1`（完整展开，因为该工具定位就是看 prefab 内部结构）。需要限制层级时显式传 `--depth N`。
 
+**D10. `gameobject-set` 的 `--move/--rotate/--zoom` 与绝对参数混用时的顺序？**
+相对操作在**绝对设置（`--position/--rotation/--scale`）之后**执行，所以 `--position "0,0,0" --zoom "2,1,1"` 是先归零再放大。`--rotate` 四元数模式是**右乘**（`当前旋转 * 输入`，即先自身旋转再按输入旋转）；欧拉角模式是各分量直接相加。`--zoom` 是**相乘**（`"2,1,1"` = x 放大 2 倍），不是相加。
+
 ## E. 环境与维护
 
 **E1. Python 需要装包吗？**

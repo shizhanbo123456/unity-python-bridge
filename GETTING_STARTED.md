@@ -17,6 +17,7 @@
 ## 2. 这个工具能做什么（一分钟速览）
 
 - **命令行操控 Unity 编辑器**：读场景结构、查资产、算包围盒、截图
+- **物体操作**：`gameobject.get/set` 读写 active/position/rotation/scale（支持 Undo），并有相对操作 `--move`（位移+=）/ `--rotate`（欧拉各分量加、四元数乘）/ `--zoom`（缩放各分量乘）
 - **场景与 Prefab 层级查看**：`scene.tree` 树状看场景（prefab 实例折叠并标注资产路径，支持深度/起点）；`prefab.tree` 直接看 prefab 资产内部层级；`scene.important_scripts` 一键列出挂有 Manager/Tool 等重要脚本的物体
 - **地形程序化生成**：造山（噪声）、铺纹理、撒植被、种树，一条命令完成
 - **地形快照**：把树木/植被存成 JSON，随时恢复（stash → clear → 截图 → apply）

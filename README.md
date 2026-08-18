@@ -94,6 +94,12 @@ python -m unity_bridge tree --path "MainCamera/Object1"  # 只从指定物体开
 python -m unity_bridge bounds Assets/Prefabs/Tree.prefab --json
 python -m unity_bridge shot Assets/Prefabs/Tree.prefab out/tree.png --offset "3,2,5"
 python -m unity_bridge prefab-tree Assets/Prefabs/Tree.prefab --depth 3   # path 必填
+
+# 物体操作：绝对设置 + 相对操作（move/rotate/zoom 基于当前值，支持 Undo）
+python -m unity_bridge gameobject-set "Player/Body" --position "10,0,5" --scale "2,2,2"
+python -m unity_bridge gameobject-set "Player/Body" --move "0,10,0"        # 位置 += (0,10,0)
+python -m unity_bridge gameobject-set "Player/Body" --rotate "0,90,0"      # 欧拉角各分量相加
+python -m unity_bridge gameobject-set "Player/Body" --zoom "2,1,1"         # x 轴放大 2 倍
 ```
 
 ### 3. 无 Unity 环境联调（可选）
@@ -186,7 +192,7 @@ python -m unity_bridge reload --expect-version 1.13.0 --timeout 180 --interval 2
 | 相机与截图 | 隔离渲染资产、抓相机实时画面 | `prefab.screenshot` `view.camera` |
 | 场景与 Prefab 层级 | 场景物体树（prefab 备注资产路径）/ 重要脚本 / prefab 资产内部层级 | `scene.tree` `scene.important_scripts` `prefab.tree` |
 | 网格与资源 | 包围盒 | `mesh.bounds` |
-| 物体操作 | 读写 active/transform | `gameobject.get/set` |
+| 物体操作 | 读写 active/transform；相对操作 move/rotate/zoom | `gameobject.get/set` |
 | 地形编辑 | 高度/纹理/植被/树木/快照/资源目录 | `terrain.*`（19 条） |
 
 ---
@@ -296,7 +302,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │       ├── TerrainCommands.cs      # 命令 terrain.*（高度图/纹理/植被/树木，Unity 原生 TerrainData）
 │       ├── TerrainStashCommands.cs # 命令 terrain.stash / apply_stash / stash_delete / stash_list（快照 JSON）
 │       ├── ViewScreenshotCommand.cs # 命令 view.camera（抓取指定相机实时画面；预留 view.window）
-│       ├── GameObjectCommands.cs   # 命令 gameobject.get / gameobject.set（active/position/rotation/scale）
+│       ├── GameObjectCommands.cs   # 命令 gameobject.get / gameobject.set（active/position/rotation/scale + 相对操作 move/rotate/zoom）
 │       ├── SystemCommands.cs       # bridge.ping / bridge.list_commands / bridge.version / bridge.reload
 │       └── DebugCommands.cs        # debug.log / log_warning / log_error / get_logs / log_version
 └── python/                         # Python 侧（无需安装依赖）

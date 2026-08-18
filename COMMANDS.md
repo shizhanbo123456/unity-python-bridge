@@ -151,6 +151,17 @@ python -m unity_bridge important-scripts                      # 列出场景中�
 python -m unity_bridge prefab-tree Assets/Prefabs/Tree.prefab # 直接查看 prefab 资产内部层级（path 必填，默认完整展开）
 ```
 
+### 物体相对变换（基于当前值，支持 Undo）
+```bash
+python -m unity_bridge gameobject-get "Player/Body"           # 先读当前状态
+python -m unity_bridge gameobject-set "Player/Body" --move "0,10,0"    # 相对位移：position += (0,10,0)
+python -m unity_bridge gameobject-set "Player/Body" --rotate "0,90,0"  # 相对旋转：欧拉角各分量相加
+python -m unity_bridge gameobject-set "Player/Body" --rotate "0,0,0.7071,0.7071" --quaternion  # 四元数：与当前旋转相乘
+python -m unity_bridge gameobject-set "Player/Body" --zoom "2,1,1"     # 相对缩放：x 轴放大 2 倍（相乘，非相加）
+# 绝对设置与相对操作可混用（相对操作在绝对设置之后执行）：
+python -m unity_bridge gameobject-set "Player/Body" --position "0,0,0" --zoom "0.5,0.5,0.5"
+```
+
 ### 自诊断（日志读回 + 重编译）
 ```bash
 python -m unity_bridge debug-logs --type error --count 20   # 读最近 20 条错误（含 stackTrace）
