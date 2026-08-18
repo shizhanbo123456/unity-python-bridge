@@ -165,5 +165,5 @@ python -m unity_bridge gameobject-set "Player/Body" --position "0,0,0" --zoom "0
 ### 自诊断（日志读回 + 重编译）
 ```bash
 python -m unity_bridge debug-logs --type error --count 20   # 读最近 20 条错误（含 stackTrace）
-python -m unity_bridge reload --expect-version 1.12.0        # 改完 C# 后触发重编译并等待恢复
+python -m unity_bridge reload --expect-version 1.13.0        # 改完 C# 后触发重编译并等待恢复
 ```
