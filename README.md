@@ -295,7 +295,6 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │   ├── BridgeServer.cs             # TCP 服务器（单行 JSON，JsonUtility；自带 Flush 驱动，不依赖组件）
 │   ├── BridgeStateStore.cs         # 状态文件读写（Library/BridgeServerState.txt）
 │   ├── MainThreadRunner.cs         # 主线程执行队列
-│   ├── UniformPointGenerator.cs    # 工具类：均匀分布随机点生成（网格抖动，seed 可复现；供命令内部调用，不注册命令）
 │   └── Commands/
 │       ├── SceneTreeCommand.cs     # 命令 scene.tree（场景层级树，depth/path/prefab 折叠）+ scene.important_scripts（重要脚本检索，规则读 ini）+ prefab.tree（prefab 资产内部层级树，path 必填）
 │       ├── MeshBoundsCommand.cs    # 命令 mesh.bounds（包围盒计算）
