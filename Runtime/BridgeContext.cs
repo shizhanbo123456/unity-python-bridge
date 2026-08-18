@@ -23,12 +23,16 @@ namespace UnityPythonBridge
     {
         // ---- scene.tree ----
         public bool components;
+        /// <summary>scene.tree：遍历深度（根算第 1 层，默认 1 只显示起点本身）。</summary>
+        public int depth;
 
         // ---- debug.log / debug.log_warning / debug.log_error / debug.get_logs ----
         // 注意：count 复用下方 terrain 段的同名字段（均表示"数量"），勿重复声明
         public string message;
 
-        // ---- mesh.bounds / prefab.screenshot ----
+        // ---- mesh.bounds / prefab.screenshot / scene.tree(起点) ----
+        // 注意：path 被多命令复用——mesh.bounds/prefab.screenshot 解释为 Assets 资产路径，
+        // scene.tree 解释为扫描起点（层级路径或唯一名称），各自命令自行解释，勿重复声明
         public string path;
         public string output;
         public Vector3 offset;

@@ -122,8 +122,17 @@ class UnityClient:
         """在 Unity Console 打印桥接层版本号（含命令总数）。"""
         return self.call("debug.log_version")
 
-    def scene_tree(self, components: bool = False) -> dict:
-        return self.call("scene.tree", components=components)
+    def scene_tree(self, components: bool = False, depth: int = 1, path: str = None) -> dict:
+        """获取场景物体层级树。
+
+        depth: 遍历深度（根算第 1 层，默认 1 只显示起点本身）。
+        path: 扫描起点，层级路径（如 "MainCamera/Object1"）或唯一名称；省略则扫描整个场景。
+              起点为 prefab 实例内部时报错（返回 prefab 根场景路径与资产路径）。
+        """
+        args = {"components": components, "depth": depth}
+        if path:
+            args["path"] = path
+        return self.call("scene.tree", **args)
 
     def scene_important_scripts(self) -> dict:
         """列出场景中挂有重要脚本（类名以 bridge.ini [scene] important_suffix

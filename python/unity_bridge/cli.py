@@ -65,13 +65,14 @@ def _render(node: dict, prefix: str, connector: str, out: List[str]) -> None:
 
 def _cmd_tree(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
-        data = client.scene_tree(components=args.components)
+        data = client.scene_tree(components=args.components, depth=args.depth, path=args.path)
 
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return 0
 
-    print(f"Scene: {data.get('name', '?')}  ({data.get('rootCount', '?')} 个根物体)")
+    print(f"Scene: {data.get('name', '?')}  ({data.get('rootCount', '?')} 个根物体)"
+          + (f"  起点: {data.get('startPath')}" if data.get("startPath") else ""))
     for root in data.get("roots", []):
         for line in render_tree(root):
             print(line)
@@ -677,6 +678,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_tree = sub.add_parser("tree", help="以树状结构打印当前场景中的物体名称")
     p_tree.add_argument("--components", action="store_true", help="同时显示每个物体的组件类型")
+    p_tree.add_argument("--depth", type=int, default=1,
+                        help="遍历深度（根算第 1 层，默认 1 只显示起点本身）")
+    p_tree.add_argument("--path", default=None,
+                        help="扫描起点：层级路径（如 MainCamera/Object1）或唯一名称；默认扫描整个场景；"
+                             "起点为 prefab 实例内部时报错（返回 prefab 根场景路径与资产路径）")
     p_tree.add_argument("--json", action="store_true", help="输出原始 JSON 而非树形文本")
     p_tree.set_defaults(func=_cmd_tree)
 

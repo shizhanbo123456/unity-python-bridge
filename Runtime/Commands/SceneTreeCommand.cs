@@ -17,36 +17,138 @@ namespace UnityPythonBridge.Commands
     ///
     /// 参数:
     ///   components (bool, 可选) - 为 true 时每个节点附带组件类型列表
+    ///   depth (int, 可选) - 遍历深度，根算第 1 层，默认 1（只显示起点本身）
+    ///   path (string, 可选) - 扫描起点：层级路径（如 "MainCamera/Object1"）或唯一名称；
+    ///                          省略则扫描整个场景；起点为 prefab 实例内部时报错
     /// 返回（JSON 文本）:
-    ///   { type, name, path, buildIndex, rootCount, roots: [ { name, active, components?, prefab?, children: [...] } ] }
+    ///   { type, name, path, buildIndex, startPath?, rootCount, roots: [ { name, active, components?, prefab?, children: [...] } ] }
     ///
     /// prefab 实例根节点不展开内部结构，附加 "prefab" 字段为资产路径（Assets/...）。
     /// </summary>
     public static class SceneTreeCommand
     {
         [BridgeCommand("scene.tree",
-            "以树状结构返回当前场景中的物体层级。参数: components(bool) 是否附带组件类型")]
+            "以树状结构返回当前场景中的物体层级。参数: components(bool), depth(int,遍历深度,根算第1层,默认1), path(string,可选,扫描起点,层级路径或唯一名称)")]
         public static object Tree(BridgeContext ctx, BridgeArgs args)
         {
             bool withComponents = args.components;
+            int maxDepth = args.depth <= 0 ? 1 : args.depth; // 根算第 1 层，默认 1 只显示起点本身
+            string startPath = string.IsNullOrWhiteSpace(args.path) ? null : args.path.Trim();
 
             var scene = SceneManager.GetActiveScene();
-            var roots = scene.GetRootGameObjects();
+
+            // 确定扫描起点：指定 path 时从该物体开始；否则从场景根物体开始
+            Transform[] starts;
+            if (startPath != null)
+            {
+                starts = new[] { ResolveStartTransform(startPath) };
+            }
+            else
+            {
+                var roots = scene.GetRootGameObjects();
+                starts = new Transform[roots.Length];
+                for (var i = 0; i < roots.Length; i++) starts[i] = roots[i].transform;
+            }
 
             var sb = new StringBuilder(4096);
             sb.Append("{\"type\":\"scene\"");
             sb.Append(",\"name\":").Append(JsonString(scene.name));
             sb.Append(",\"path\":").Append(JsonString(scene.path));
             sb.Append(",\"buildIndex\":").Append(scene.buildIndex);
-            sb.Append(",\"rootCount\":").Append(roots.Length);
+            if (startPath != null)
+            {
+                sb.Append(",\"startPath\":").Append(JsonString(startPath));
+            }
+            sb.Append(",\"rootCount\":").Append(starts.Length);
             sb.Append(",\"roots\":[");
-            for (var i = 0; i < roots.Length; i++)
+            for (var i = 0; i < starts.Length; i++)
             {
                 if (i > 0) sb.Append(',');
-                AppendNode(sb, roots[i].transform, withComponents);
+                AppendNode(sb, starts[i], withComponents, maxDepth, 1);
             }
             sb.Append("]}");
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// 解析 scene.tree 的扫描起点：层级路径（从场景根开始 '/' 分隔，如 "MainCamera/Object1"）
+        /// 或唯一名称。找不到/重名时抛异常。起点位于 prefab 实例内部（非实例根）时抛异常，
+        /// 错误信息含 prefab 根在场景中的路径与 Assets 中 prefab 路径。
+        /// </summary>
+        private static Transform ResolveStartTransform(string target)
+        {
+            var scene = SceneManager.GetActiveScene();
+
+            if (target.IndexOf('/') >= 0)
+            {
+                var segs = target.Split(new[] { '/' }, System.StringSplitOptions.RemoveEmptyEntries);
+                if (segs.Length == 0)
+                    throw new System.ArgumentException("路径无效: " + target);
+                var matches = new List<Transform>();
+                foreach (var root in scene.GetRootGameObjects())
+                    MatchPathTransform(root.transform, segs, 0, matches);
+                if (matches.Count == 0)
+                    throw new System.InvalidOperationException($"场景中未找到路径 '{target}'");
+                if (matches.Count > 1)
+                    throw new System.InvalidOperationException($"路径 '{target}' 匹配到 {matches.Count} 个物体，请使用更完整的路径");
+                CheckNotInsidePrefab(target, matches[0].gameObject);
+                return matches[0];
+            }
+
+            // 按名称（唯一命中，重名报错）
+            var byName = new List<Transform>();
+            foreach (var root in scene.GetRootGameObjects())
+                CollectByNameTransform(root.transform, target, byName);
+            if (byName.Count == 0)
+                throw new System.InvalidOperationException($"场景中未找到名为 '{target}' 的物体");
+            if (byName.Count > 1)
+                throw new System.InvalidOperationException($"场景中有 {byName.Count} 个名为 '{target}' 的物体，请使用层级路径");
+            CheckNotInsidePrefab(target, byName[0].gameObject);
+            return byName[0];
+        }
+
+        /// <summary>起点不允许位于 prefab 实例内部（允许起点就是 prefab 实例根）。
+        /// 报错时附带 prefab 根在场景中的路径与 Assets 中 prefab 路径。</summary>
+        private static void CheckNotInsidePrefab(string target, GameObject go)
+        {
+            if (!PrefabUtility.IsPartOfPrefabInstance(go) || PrefabUtility.IsAnyPrefabInstanceRoot(go))
+                return; // 普通物体或 prefab 实例根：允许
+
+            var root = PrefabUtility.GetOutermostPrefabInstanceRoot(go);
+            // 注意：该 API 在不同 Unity 版本返回类型不同（旧版 Transform / 新版 GameObject），
+            // .transform 对两者均成立（Component.transform 返回自身，GameObject.transform 返回其 Transform）
+            string rootPath = root != null ? TransformPath(root.transform) : "?";
+            string assetPath = PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(go) ?? "";
+            throw new System.InvalidOperationException(
+                $"不能直接扫描 prefab 实例内部 '{target}': prefab 根在场景中的路径为 '{rootPath}', " +
+                $"Assets 中 prefab 路径为 '{assetPath}'。请从 prefab 根或场景根开始扫描。");
+        }
+
+        private static void MatchPathTransform(Transform t, string[] segs, int depth, List<Transform> matches)
+        {
+            // 名称按 Trim 后比较：宽容物体名首尾空格（如 prefab 内部物体名 "Cylinder "），
+            // 保证 "Tree_A_1/Cylinder" 能命中 prefab 内部并触发"不可扫描 prefab 内部"报错
+            if (t.name.Trim() != segs[depth].Trim()) return;
+            if (depth == segs.Length - 1)
+            {
+                matches.Add(t);
+                return;
+            }
+            for (var i = 0; i < t.childCount; i++)
+            {
+                var child = t.GetChild(i);
+                if (child != null) MatchPathTransform(child, segs, depth + 1, matches);
+            }
+        }
+
+        private static void CollectByNameTransform(Transform t, string name, List<Transform> matches)
+        {
+            if (t.name.Trim() == name.Trim()) matches.Add(t);
+            for (var i = 0; i < t.childCount; i++)
+            {
+                var child = t.GetChild(i);
+                if (child != null) CollectByNameTransform(child, name, matches);
+            }
         }
 
         /// <summary>
@@ -186,8 +288,10 @@ namespace UnityPythonBridge.Commands
         }
 
         /// <summary>递归构建单个节点 JSON（无深度限制）。prefab 实例根不展开内部结构，
-        /// 改为附加 prefab 资产路径（Assets/...，见 "prefab" 字段）。</summary>
-        private static void AppendNode(StringBuilder sb, Transform t, bool withComponents)
+        /// 改为附加 prefab 资产路径（Assets/...，见 "prefab" 字段）。
+        /// maxDepth=最大遍历深度（根算第 1 层）；currentDepth=当前节点深度。</summary>
+        private static void AppendNode(StringBuilder sb, Transform t, bool withComponents,
+            int maxDepth, int currentDepth)
         {
             var go = t.gameObject;
             sb.Append("{\"name\":").Append(JsonString(go.name));
@@ -219,14 +323,17 @@ namespace UnityPythonBridge.Commands
             }
 
             sb.Append(",\"children\":[");
-            bool firstChild = true;
-            for (var i = 0; i < t.childCount; i++)
+            if (currentDepth < maxDepth)
             {
-                var child = t.GetChild(i);
-                if (child == null) continue;
-                if (!firstChild) sb.Append(',');
-                firstChild = false;
-                AppendNode(sb, child, withComponents);
+                bool firstChild = true;
+                for (var i = 0; i < t.childCount; i++)
+                {
+                    var child = t.GetChild(i);
+                    if (child == null) continue;
+                    if (!firstChild) sb.Append(',');
+                    firstChild = false;
+                    AppendNode(sb, child, withComponents, maxDepth, currentDepth + 1);
+                }
             }
             sb.Append("]}");
         }
