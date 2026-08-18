@@ -76,6 +76,22 @@ def _cmd_tree(args) -> int:
     return 0
 
 
+def _cmd_important_scripts(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.scene_important_scripts()
+
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+
+    suffix = ", ".join(data.get("suffix", []))
+    print(f"Scene: {data.get('scene', '?')}  匹配后缀: {suffix}  ({data.get('count', 0)} 个重要脚本)")
+    for e in data.get("scripts", []):
+        active = "" if e.get("active") else "  (inactive)"
+        print(f"  {e.get('path')}  [{e.get('name')}]{active}")
+    return 0
+
+
 def _cmd_list(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.list_commands()
@@ -661,6 +677,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_tree.add_argument("--components", action="store_true", help="同时显示每个物体的组件类型")
     p_tree.add_argument("--json", action="store_true", help="输出原始 JSON 而非树形文本")
     p_tree.set_defaults(func=_cmd_tree)
+
+    p_imps = sub.add_parser("important-scripts", aliases=["impscripts", "imps"],
+                            help="列出场景中挂有重要脚本的物体（类名以 Manager/Tool 等后缀结尾，"
+                                 "规则见 bridge.ini [scene] important_suffix）")
+    p_imps.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_imps.set_defaults(func=_cmd_important_scripts)
 
     p_list = sub.add_parser("list", aliases=["ls"], help="列出 Unity 侧所有已注册的命令")
     p_list.set_defaults(func=_cmd_list)

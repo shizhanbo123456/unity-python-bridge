@@ -22,8 +22,10 @@ namespace UnityPythonBridge
         ///   v1.6.0 版本号维护
         ///   v1.7.0 服务器重复启动/停止时打印 Warning 提示
         ///   v1.8.0 prefab.screenshot 支持直接指定相机位置与观察目标（世界/相对）
+        ///   v1.9.0 新增 scene.important_scripts（列出挂有 Manager/Tool 等后缀脚本的物体，
+        ///          匹配规则来自 bridge.ini [scene] important_suffix）
         /// </summary>
-        public const string Version = "1.8.0";
+        public const string Version = "1.9.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

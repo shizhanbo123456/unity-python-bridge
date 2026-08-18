@@ -2,7 +2,7 @@
 
 > 本文件是完整的命令参考；**使用方法、架构、配置见 `README.md`**。
 > 命令清单已对照源码（C# `[BridgeCommand]` 反射注册 + Python CLI 封装）逐一核对。
-> 版本：v1.8.0（34 条）｜整理日期：2026-08-18
+> 版本：v1.9.0（35 条）｜整理日期：2026-08-18
 
 ## 全局约定
 
@@ -55,11 +55,12 @@ python -m unity_bridge terrain-list --json
 
 > `prefab.screenshot` = 单资产隔离渲染（不依赖场景相机）；`view.camera` = 场景已有相机的实时画面。抓"Scene/Game 窗口最终呈现"（含 UI 叠加）为规划中的 `view.window`，尚未实现。
 
-## 四、场景层级（1 条）
+## 四、场景层级（2 条）
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `scene.tree` | `tree` | 树状输出场景物体层级；`--components`（同时显示组件类型）、`--json`（原始数据） |
+| `scene.important_scripts` | `important-scripts`（`impscripts`、`imps`） | 列出场景中挂有"重要脚本"的物体；匹配规则取 `bridge.ini` 的 `[scene] important_suffix`（逗号分隔的类名后缀，默认 `Manager, Tool`，忽略大小写）；扫描范围含未激活物体（`active` 标注实际状态）；返回 `suffix`（生效规则）、`scripts`（`path` 层级路径 / `name` 脚本名 / `active`） |
 
 ## 五、网格与资源（1 条）
 

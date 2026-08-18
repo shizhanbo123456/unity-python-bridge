@@ -125,6 +125,15 @@ class UnityClient:
     def scene_tree(self, components: bool = False) -> dict:
         return self.call("scene.tree", components=components)
 
+    def scene_important_scripts(self) -> dict:
+        """列出场景中挂有重要脚本（类名以 bridge.ini [scene] important_suffix
+        中任一后缀结尾，默认 Manager / Tool）的物体。
+
+        返回 {"type", "scene", "suffix": [...], "count", "scripts":
+        [{path, name, active}, ...]}；扫描范围含未激活物体。
+        """
+        return self.call("scene.important_scripts")
+
     def mesh_bounds(self, path: str) -> dict:
         return self.call("mesh.bounds", path=path)
 
