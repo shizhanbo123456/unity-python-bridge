@@ -343,10 +343,24 @@ def _cmd_gameobject_set(args) -> int:
             return 1
         rotation = parts
 
+    move = _vec3(args.move) if args.move else None
+    zoom = _vec3(args.zoom) if args.zoom else None
+    rotate = None
+    if args.rotate:
+        parts = [float(x) for x in args.rotate.replace(",", " ").split()]
+        if args.quaternion and len(parts) != 4:
+            print("[错误] --quaternion 时 --rotate 需要 4 个分量 {x,y,z,w}", file=sys.stderr)
+            return 1
+        if not args.quaternion and len(parts) != 3:
+            print("[错误] --rotate 需要 3 个分量 {x,y,z}（欧拉角）", file=sys.stderr)
+            return 1
+        rotate = parts
+
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.gameobject_set(
             args.target, active=args.active, position=position,
-            rotation=rotation, scale=scale, quaternion=args.quaternion)
+            rotation=rotation, scale=scale, quaternion=args.quaternion,
+            move=move, rotate=rotate, zoom=zoom)
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
         return 0
@@ -821,15 +835,22 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_gset = sub.add_parser(
         "gameobject-set", aliases=["gset"],
-        help="写入 GameObject 的 active 状态与 Transform 的 position/rotation/scale（支持 Undo）")
+        help="写入 GameObject 的 active 状态与 Transform 的 position/rotation/scale（支持 Undo），"
+             "并支持相对操作 move/rotate/zoom")
     p_gset.add_argument("target", help="层级路径（如 Player/Body）优先，名称兼容（重名报错）")
     p_gset.add_argument("--active", type=int, default=-1,
                         help="0=隐藏 1=激活（默认 -1 不改）")
-    p_gset.add_argument("--position", default=None, help="世界坐标 'x,y,z'")
+    p_gset.add_argument("--position", default=None, help="世界坐标 'x,y,z'（绝对设置）")
     p_gset.add_argument("--rotation", default=None,
-                        help="欧拉角 'x,y,z'；--quaternion 时四元数 'x,y,z,w'")
-    p_gset.add_argument("--scale", default=None, help="localScale 'x,y,z'")
-    p_gset.add_argument("--quaternion", action="store_true", help="rotation 按四元数输入/输出")
+                        help="欧拉角 'x,y,z'；--quaternion 时四元数 'x,y,z,w'（绝对设置）")
+    p_gset.add_argument("--scale", default=None, help="localScale 'x,y,z'（绝对设置）")
+    p_gset.add_argument("--move", default=None,
+                        help="相对位移 'x,y,z'：position += move（基于当前值）")
+    p_gset.add_argument("--rotate", default=None,
+                        help="相对旋转：欧拉角 'x,y,z' 各分量相加；--quaternion 时四元数 'x,y,z,w' 与当前相乘")
+    p_gset.add_argument("--zoom", default=None,
+                        help="相对缩放 'x,y,z'：localScale 各分量相乘（如 '2,1,1' = x 轴放大 2 倍）")
+    p_gset.add_argument("--quaternion", action="store_true", help="rotation/rotate 按四元数输入/输出")
     p_gset.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_gset.set_defaults(func=_cmd_gameobject_set)
 

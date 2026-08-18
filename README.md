@@ -164,7 +164,7 @@ important_suffix = Manager, Tool  ; scene.important_scripts 的重要脚本匹�
 python -m unity_bridge reload
 
 # 指定期望版本（不匹配则继续等待）、自定义超时与轮询间隔
-python -m unity_bridge reload --expect-version 1.12.0 --timeout 180 --interval 2
+python -m unity_bridge reload --expect-version 1.13.0 --timeout 180 --interval 2
 ```
 
 - **原理**：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `CompilationPipeline.RequestScriptCompilation()` 触发重编译；重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。
@@ -321,4 +321,4 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 - 若要在打包后的 Player 中使用，请自行评估：本项目针对 **Editor 开发期工具** 场景。
 - **首次导入后**：Unity 会为脚本生成 `.meta` 文件（GUID）。若希望跨项目复制时保持 GUID 稳定（推荐），请把生成的 `.meta` 一并提交到 git。
 - **自动化编译**：`bridge.reload` 是进程内 API，可稳定触发重编译（需 Unity 前台）；**模拟鼠标点击对 Unity 编辑器无效**（编辑器忽略注入输入），不要走那条路。
-- **版本演进**（当前 v1.12.0）：v1.0.0=独立重构（JsonUtility，5 条命令）→ v1.1.0=新增 12 条 terrain 命令 → v1.2.0=修复 list_commands 序列化 + 版本工具 → v1.3.0=新增 terrain.stash 四命令、view.camera、gameobject.get/set → v1.4.0=新增 debug.get_logs → v1.5.0=新增 debug.log_version → v1.6.0=版本号维护 → v1.7.0=服务器重复启动/停止打印 Warning → v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标 → v1.9.0=新增 scene.important_scripts（重要脚本检索，匹配规则来自 bridge.ini [scene] important_suffix，默认 Manager/Tool 结尾）→ v1.10.0=scene.tree 遇到 prefab 实例根不展开内部，改为备注 prefab 资产路径 → v1.11.0=scene.tree 新增 depth（遍历深度，根算第 1 层，默认 1）与 path（扫描起点；prefab 内部报错）→ v1.12.0=新增 prefab.tree（prefab 资产内部层级树，path 必填，depth 默认完整展开）。可用 `python -m unity_bridge version` 或 `debug-log-version` 确认当前版本。
+- **版本演进**（当前 v1.13.0）：v1.0.0=独立重构（JsonUtility，5 条命令）→ v1.1.0=新增 12 条 terrain 命令 → v1.2.0=修复 list_commands 序列化 + 版本工具 → v1.3.0=新增 terrain.stash 四命令、view.camera、gameobject.get/set → v1.4.0=新增 debug.get_logs → v1.5.0=新增 debug.log_version → v1.6.0=版本号维护 → v1.7.0=服务器重复启动/停止打印 Warning → v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标 → v1.9.0=新增 scene.important_scripts（重要脚本检索，匹配规则来自 bridge.ini [scene] important_suffix，默认 Manager/Tool 结尾）→ v1.10.0=scene.tree 遇到 prefab 实例根不展开内部，改为备注 prefab 资产路径 → v1.11.0=scene.tree 新增 depth（遍历深度，根算第 1 层，默认 1）与 path（扫描起点；prefab 内部报错）→ v1.12.0=新增 prefab.tree（prefab 资产内部层级树，path 必填，depth 默认完整展开）→ v1.13.0=gameobject.set 新增相对操作 move（position+=）/ rotate（欧拉各分量加、四元数乘）/ zoom（localScale 各分量乘）。可用 `python -m unity_bridge version` 或 `debug-log-version` 确认当前版本。

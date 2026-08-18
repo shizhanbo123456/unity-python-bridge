@@ -342,14 +342,18 @@ class UnityClient:
         return self.call("gameobject.get", target=target, quaternion=quaternion)
 
     def gameobject_set(self, target: str, active: int = -1, position=None,
-                       rotation=None, scale=None, quaternion: bool = False) -> dict:
+                       rotation=None, scale=None, quaternion: bool = False,
+                       move=None, rotate=None, zoom=None) -> dict:
         """写入 GameObject 的 active 状态与 Transform 的 position/rotation/scale。
 
         active: -1 不改 / 0 隐藏 / 1 激活。
         position: [x, y, z] 世界坐标，None 不改。
         rotation: 默认 [x, y, z] 欧拉角；quaternion=True 时 [x, y, z, w] 四元数，None 不改。
         scale: [x, y, z] localScale，None 不改。
-        返回设置后的完整状态。
+        move: [x, y, z] 相对位移（position += move），None 不改。
+        rotate: 默认 [x, y, z] 欧拉角（各分量相加）；quaternion=True 时 [x, y, z, w] 四元数（与当前相乘），None 不改。
+        zoom: [x, y, z] 相对缩放（localScale 各分量相乘），None 不改。
+        相对操作在绝对设置之后执行；返回设置后的完整状态。
         """
         args = {"target": target}
         if active != -1:
@@ -360,6 +364,12 @@ class UnityClient:
             args["rotation"] = list(rotation)
         if scale is not None:
             args["scale"] = list(scale)
+        if move is not None:
+            args["move"] = list(move)
+        if rotate is not None:
+            args["rotate"] = list(rotate)
+        if zoom is not None:
+            args["zoom"] = list(zoom)
         if quaternion:
             args["quaternion"] = True
         return self.call("gameobject.set", **args)

@@ -2,7 +2,7 @@
 
 > 本文件是完整的命令参考；**使用方法、架构、配置见 `README.md`**。
 > 命令清单已对照源码（C# `[BridgeCommand]` 反射注册 + Python CLI 封装）逐一核对。
-> 版本：v1.12.0（36 条）｜整理日期：2026-08-18
+> 版本：v1.13.0（36 条）｜整理日期：2026-08-18
 
 ## 全局约定
 
@@ -74,7 +74,7 @@ python -m unity_bridge terrain-list --json
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `gameobject.get` | `gameobject-get`（`gget`） | 读 active / position(世界) / rotation / scale(localScale)；`target`（层级路径优先，名称兼容，重名报错）、`--quaternion`（同时输出四元数） |
-| `gameobject.set` | `gameobject-set`（`gset`） | 写上述属性（支持 Undo）；`target`、`--active`(-1 不改/0 隐藏/1 激活)、`--position "x,y,z"`、`--rotation "x,y,z"`（`--quaternion` 时 `"x,y,z,w"`）、`--scale "x,y,z"` |
+| `gameobject.set` | `gameobject-set`（`gset`） | 写上述属性（支持 Undo）；`target`、`--active`(-1 不改/0 隐藏/1 激活)、`--position "x,y,z"`、`--rotation "x,y,z"`（`--quaternion` 时 `"x,y,z,w"`）、`--scale "x,y,z"`；**相对操作**（基于当前值，在绝对设置后执行）：`--move "x,y,z"`（position+=）、`--rotate "x,y,z"`（欧拉各分量相加；`--quaternion` 时四元数 `"x,y,z,w"` 与当前相乘）、`--zoom "x,y,z"`（localScale 各分量相乘，如 `"2,1,1"`=x 放大 2 倍） |
 
 ## 七、地形编辑（19 条）
 

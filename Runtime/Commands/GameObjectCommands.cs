@@ -60,7 +60,9 @@ namespace UnityPythonBridge.Commands
         [BridgeCommand("gameobject.set",
             "写入 GameObject 的 active 状态与 Transform 的 position/rotation/scale（支持 Undo）。参数: target(string,必填), " +
             "active(int,可选 -1=不改 0=隐藏 1=激活), position(float[]3,可选,世界), " +
-            "rotation(float[]3欧拉或4四元数,可选,quaternion=true时按四元数), scale(float[]3,可选,localScale)")]
+            "rotation(float[]3欧拉或4四元数,可选,quaternion=true时按四元数), scale(float[]3,可选,localScale), " +
+            "move(float[]3,可选,相对位移 position+=), rotate(float[]3欧拉各分量加或4四元数相乘,可选,quaternion=true时按四元数), " +
+            "zoom(float[]3,可选,相对缩放 localScale 各分量相乘)")]
         public static object Set(BridgeContext ctx, BridgeArgs args)
         {
             var go = ResolveTarget(args.target);
@@ -104,6 +106,41 @@ namespace UnityPythonBridge.Commands
                 if (args.scale.Length != 3)
                     throw new ArgumentException("scale 必须是 3 个分量 {x,y,z}");
                 tf.localScale = new Vector3(args.scale[0], args.scale[1], args.scale[2]);
+            }
+
+            // ---- 相对操作（基于当前值）----
+            if (args.move != null)
+            {
+                if (args.move.Length != 3)
+                    throw new ArgumentException("move 必须是 3 个分量 {x,y,z}");
+                tf.position += new Vector3(args.move[0], args.move[1], args.move[2]);
+            }
+
+            if (args.rotate != null)
+            {
+                if (args.quaternion)
+                {
+                    if (args.rotate.Length != 4)
+                        throw new ArgumentException("quaternion=true 时 rotate 必须是 4 个分量 {x,y,z,w}");
+                    // 四元数相乘：在当前旋转基础上按输入四元数旋转
+                    tf.rotation = tf.rotation * new Quaternion(args.rotate[0], args.rotate[1], args.rotate[2], args.rotate[3]);
+                }
+                else
+                {
+                    if (args.rotate.Length != 3)
+                        throw new ArgumentException("rotate 必须是 3 个分量 {x,y,z}（欧拉角，各分量相加）");
+                    // 欧拉角各分量直接相加
+                    tf.rotation = Quaternion.Euler(tf.eulerAngles +
+                        new Vector3(args.rotate[0], args.rotate[1], args.rotate[2]));
+                }
+            }
+
+            if (args.zoom != null)
+            {
+                if (args.zoom.Length != 3)
+                    throw new ArgumentException("zoom 必须是 3 个分量 {x,y,z}");
+                var s = tf.localScale;
+                tf.localScale = new Vector3(s.x * args.zoom[0], s.y * args.zoom[1], s.z * args.zoom[2]);
             }
 
             return BuildState(args.target, go, args.quaternion);

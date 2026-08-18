@@ -28,8 +28,10 @@ namespace UnityPythonBridge
         ///   v1.11.0 scene.tree 新增 depth（遍历深度，根算第 1 层，默认 1）与 path（扫描起点，
         ///          层级路径/唯一名称；prefab 实例内部报错并返回 prefab 根与资产路径）
         ///   v1.12.0 新增 prefab.tree（prefab 资产内部层级树，path 必填；depth 默认完整展开）
+        ///   v1.13.0 gameobject.set 新增相对操作 move（position+=）/ rotate（欧拉各分量加、四元数乘）/
+        ///          zoom（localScale 各分量乘）
         /// </summary>
-        public const string Version = "1.12.0";
+        public const string Version = "1.13.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

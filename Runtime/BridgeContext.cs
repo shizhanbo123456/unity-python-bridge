@@ -102,6 +102,14 @@ namespace UnityPythonBridge
         public float[] rotation;
         /// <summary>gameobject.set：localScale（float[] 3），null=不修改。</summary>
         public float[] scale;
+
+        // ---- gameobject.set 相对操作（基于当前值）----
+        /// <summary>gameobject.set：相对位移（float[] 3），position += move，null=不修改。</summary>
+        public float[] move;
+        /// <summary>gameobject.set：相对旋转（默认欧拉角 float[] 3，各分量相加；quaternion=true 时四元数 float[] 4，与当前四元数相乘），null=不修改。</summary>
+        public float[] rotate;
+        /// <summary>gameobject.set：相对缩放（float[] 3），localScale 各分量相乘（如 "2,1,1" = x 轴放大 2 倍），null=不修改。</summary>
+        public float[] zoom;
     }
 
     /// <summary>TCP 请求行：{id, cmd, args}。</summary>
