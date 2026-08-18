@@ -2,7 +2,7 @@
 
 > 本文件是完整的命令参考；**使用方法、架构、配置见 `README.md`**。
 > 命令清单已对照源码（C# `[BridgeCommand]` 反射注册 + Python CLI 封装）逐一核对。
-> 版本：v1.11.0（35 条）｜整理日期：2026-08-18
+> 版本：v1.12.0（36 条）｜整理日期：2026-08-18
 
 ## 全局约定
 
@@ -55,12 +55,13 @@ python -m unity_bridge terrain-list --json
 
 > `prefab.screenshot` = 单资产隔离渲染（不依赖场景相机）；`view.camera` = 场景已有相机的实时画面。抓"Scene/Game 窗口最终呈现"（含 UI 叠加）为规划中的 `view.window`，尚未实现。
 
-## 四、场景层级（2 条）
+## 四、场景与 Prefab 层级（3 条）
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `scene.tree` | `tree` | 树状输出场景物体层级；**prefab 实例根不展开内部，备注资产路径**（`(prefab: Assets/...)`）；`--depth`（遍历深度，根算第 1 层，默认 1 只显示起点本身）、`--path`（扫描起点，层级路径如 `MainCamera/Object1` 或唯一名称，省略=整个场景；起点为 prefab 实例内部时报错并返回 prefab 根场景路径+资产路径）、`--components`（同时显示组件类型）、`--json`（原始数据，prefab 根含 `"prefab"` 字段，指定起点时含 `"startPath"` 字段） |
 | `scene.important_scripts` | `important-scripts`（`impscripts`、`imps`） | 列出场景中挂有"重要脚本"的物体；匹配规则取 `bridge.ini` 的 `[scene] important_suffix`（逗号分隔的类名后缀，默认 `Manager, Tool`，忽略大小写）；扫描范围含未激活物体（`active` 标注实际状态）；返回 `suffix`（生效规则）、`scripts`（`path` 层级路径 / `name` 脚本名 / `active`） |
+| `prefab.tree` | `prefab-tree`（`ptree`、`pt`） | 以树状结构返回 **prefab 资产内部**的物体层级（类似 scene.tree，但扫描对象是 Assets 下的 prefab）；`path`（**必填**，Assets 相对路径，可带或不带 `Assets/` 前缀，.prefab 或模型文件）、`--depth`（根算第 1 层，默认 `-1`=完整展开）、`--components`、`--json`；嵌套 prefab 实例根同样不展开并备注资产路径 |
 
 ## 五、网格与资源（1 条）
 

@@ -79,6 +79,21 @@ def _cmd_tree(args) -> int:
     return 0
 
 
+def _cmd_prefab_tree(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.prefab_tree(args.path, components=args.components, depth=args.depth)
+
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+
+    print(f"Prefab: {data.get('path', '?')}")
+    for root in data.get("roots", []):
+        for line in render_tree(root):
+            print(line)
+    return 0
+
+
 def _cmd_important_scripts(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.scene_important_scripts()
@@ -691,6 +706,16 @@ def build_parser() -> argparse.ArgumentParser:
                                  "规则见 bridge.ini [scene] important_suffix）")
     p_imps.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_imps.set_defaults(func=_cmd_important_scripts)
+
+    p_ptree = sub.add_parser("prefab-tree", aliases=["ptree", "pt"],
+                             help="以树状结构打印 prefab 资产内部的物体层级（path 必填）")
+    p_ptree.add_argument("path", help="prefab 在 Assets 中的相对路径（如 Prefabs/Tree_A_1.prefab，"
+                                      "可带或不带 Assets/ 前缀，.prefab 或模型文件）")
+    p_ptree.add_argument("--depth", type=int, default=-1,
+                         help="遍历深度（根算第 1 层；默认 -1=完整展开）")
+    p_ptree.add_argument("--components", action="store_true", help="同时显示每个物体的组件类型")
+    p_ptree.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_ptree.set_defaults(func=_cmd_prefab_tree)
 
     p_list = sub.add_parser("list", aliases=["ls"], help="列出 Unity 侧所有已注册的命令")
     p_list.set_defaults(func=_cmd_list)

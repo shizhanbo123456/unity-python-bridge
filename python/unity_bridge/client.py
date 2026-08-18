@@ -134,6 +134,15 @@ class UnityClient:
             args["path"] = path
         return self.call("scene.tree", **args)
 
+    def prefab_tree(self, path: str, components: bool = False, depth: int = -1) -> dict:
+        """获取 prefab 资产内部的物体层级树（类似 scene.tree，path 必填）。
+
+        path: prefab 在 Assets 中的相对路径（可带或不带 Assets/ 前缀，.prefab 或模型文件）。
+        depth: 遍历深度（根算第 1 层；默认 -1=完整展开）。
+        嵌套 prefab 实例根不展开，附加 prefab 资产路径。
+        """
+        return self.call("prefab.tree", path=path, components=components, depth=depth)
+
     def scene_important_scripts(self) -> dict:
         """列出场景中挂有重要脚本（类名以 bridge.ini [scene] important_suffix
         中任一后缀结尾，默认 Manager / Tool）的物体。

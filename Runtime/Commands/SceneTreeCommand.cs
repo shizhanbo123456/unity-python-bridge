@@ -71,6 +71,48 @@ namespace UnityPythonBridge.Commands
         }
 
         /// <summary>
+        /// prefab 树命令：以树状结构返回指定 prefab 资产内部的物体层级（类似 scene.tree，
+        /// 但扫描对象是 Assets 下的 prefab 资产而非场景）。path 必填。
+        /// 嵌套 prefab 实例根同样不展开（附加 prefab 资产路径）。
+        /// depth<=0 表示完整展开（默认），与 scene.tree 的默认 1（只显示起点）不同。
+        /// </summary>
+        [BridgeCommand("prefab.tree",
+            "以树状结构返回 prefab 资产内部的物体层级。参数: path(string,必填,Assets 相对路径, .prefab 或模型文件), components(bool), depth(int,遍历深度,根算第1层,默认-1=完整展开)")]
+        public static object PrefabTree(BridgeContext ctx, BridgeArgs args)
+        {
+            var path = args.path;
+            if (string.IsNullOrWhiteSpace(path))
+                throw new System.ArgumentException("prefab.tree 需要参数 path（prefab 在 Assets 中的相对路径，必填）");
+
+            bool withComponents = args.components;
+            int maxDepth = args.depth <= 0 ? int.MaxValue : args.depth; // 默认完整展开
+
+            var resolved = NormalizeAssetPath(path);
+            var asset = AssetDatabase.LoadAssetAtPath<GameObject>(resolved);
+            if (asset == null)
+                throw new System.InvalidOperationException(
+                    $"找不到 prefab 资产: {resolved}（需为 Assets 下的 .prefab 或模型文件）");
+
+            var sb = new StringBuilder(4096);
+            sb.Append("{\"type\":\"prefab\"");
+            sb.Append(",\"path\":").Append(JsonString(resolved));
+            sb.Append(",\"rootCount\":1");
+            sb.Append(",\"roots\":[");
+            AppendNode(sb, asset.transform, withComponents, maxDepth, 1);
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        /// <summary>规范化资产路径：统一 '/' 分隔，无 "Assets/" 前缀时自动补上。</summary>
+        private static string NormalizeAssetPath(string path)
+        {
+            var p = path.Replace('\\', '/').Trim();
+            if (!p.StartsWith("Assets/", System.StringComparison.OrdinalIgnoreCase))
+                p = "Assets/" + p.TrimStart('/');
+            return p;
+        }
+
+        /// <summary>
         /// 解析 scene.tree 的扫描起点：层级路径（从场景根开始 '/' 分隔，如 "MainCamera/Object1"）
         /// 或唯一名称。找不到/重名时抛异常。起点位于 prefab 实例内部（非实例根）时抛异常，
         /// 错误信息含 prefab 根在场景中的路径与 Assets 中 prefab 路径。
