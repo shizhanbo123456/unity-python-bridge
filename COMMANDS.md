@@ -2,7 +2,7 @@
 
 > 本文件是完整的命令参考；**使用方法、架构、配置见 `README.md`**。
 > 命令清单已对照源码（C# `[BridgeCommand]` 反射注册 + Python CLI 封装）逐一核对。
-> 版本：v1.14.0（38 条）｜整理日期：2026-08-23
+> 版本：v1.14.1（38 条）｜整理日期：2026-08-23
 
 ## 全局约定
 
@@ -51,7 +51,7 @@ python -m unity_bridge terrain-list --json
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `prefab.screenshot` | `screenshot`（`shot`） | **隔离渲染**预制体/模型为 PNG（复制到 `(9999,9999,9999)`，摄后销毁）。相机定位二选一：`--offset "x,y,z"`（相对预制体，必填）或 `--camPos`/`--lookAt`（直接指定，`--relative` 切相对模式，`--lookAt` 缺省=预制体）。其它：`--orthographic`、`--fov`（透视=fov/正交=size）、`--width`（1920）、`--height`（1080）、`--bg "r,g,b[,a]"`（默认透明）、`--light`（补光强度，推荐 2） |
-| `prefab.billboard` | `prefab-billboard`（`billboard`、`pboard`） | 按 `--camera-position "x,y,z"` 指定的相机相对单位方向正交截取透明 PNG；`output` 必须是输出目录，相对路径基于 `Assets`；先计算投影 bounds，再按 `--pixels-per-meter`（默认 100）自动确定宽高；输出文件名为预制体名 |
+| `prefab.billboard` | `prefab-billboard`（`billboard`、`pboard`） | 按 `--camera-position "x,y,z"` 指定的相机相对单位方向正交截取透明 PNG；`output` 必须是输出目录，相对路径基于 `Assets`；先计算投影 bounds，再按 `--pixels-per-meter`（默认 100）自动确定宽高；`--light` 控制与相机同向的平行光强度（默认 2，负数关闭）；输出文件名为预制体名 |
 | `view.camera` | `view-screenshot`（`vshot`） | 渲染**场景中指定相机的实时画面**为 PNG（不隔离、不创建临时物体）。`output`(.png)、`--camera`（省略时依次找 MainCamera → "Main Camera" → 第一个激活相机）、`--width`/`--height`（默认相机当前分辨率） |
 
 > `prefab.screenshot` = 单资产隔离渲染（不依赖场景相机）；`view.camera` = 场景已有相机的实时画面。抓"Scene/Game 窗口最终呈现"（含 UI 叠加）为规划中的 `view.window`，尚未实现。

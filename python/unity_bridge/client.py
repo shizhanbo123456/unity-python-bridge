@@ -165,11 +165,12 @@ class UnityClient:
         return self.call("prefab.bounds", path=path)
 
     def prefab_billboard(self, path: str, output: str, camera_position,
-                         pixels_per_meter: float = 100.0) -> dict:
+                         pixels_per_meter: float = 100.0,
+                         light: float = 2.0) -> dict:
         """使用正交相机生成透明背景 billboard；相对输出目录基于 Assets。"""
         return self.call("prefab.billboard", path=path, output=output,
                          cameraPosition=list(camera_position),
-                         pixelsPerMeter=pixels_per_meter)
+                         pixelsPerMeter=pixels_per_meter, light=light)
 
     def prefab_screenshot(self, path: str, offset: dict, output: str,
                           orthographic: bool = False, fov=None,

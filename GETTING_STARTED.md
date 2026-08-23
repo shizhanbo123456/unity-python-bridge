@@ -31,7 +31,7 @@
 # ① 把 unity-python-bridge/ 整个文件夹放进 Unity 项目的 Assets/ 下
 # ② Unity 里菜单 Tools → Unity Python Bridge → Start Server（看到"监听 127.0.0.1:21927"即成功）
 # ③ 验证（在 python/ 目录下）：
-python -m unity_bridge version      # 能打印 v1.14.0 / 38 命令 = 连通 ✓
+python -m unity_bridge version      # 能打印 v1.14.1 / 38 命令 = 连通 ✓
 python -m unity_bridge tree         # 能看到场景物体树 = 命令可用 ✓
 python -m unity_bridge list         # 命令数=38 = 注册完整 ✓
 ```

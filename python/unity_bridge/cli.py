@@ -262,7 +262,8 @@ def _cmd_prefab_billboard(args) -> int:
         print(f"[错误] camera-position 解析失败: {e}", file=sys.stderr)
         return 1
     with UnityClient(args.host, args.port, args.timeout) as client:
-        data = client.prefab_billboard(args.path, args.output, direction, args.pixels_per_meter)
+        data = client.prefab_billboard(
+            args.path, args.output, direction, args.pixels_per_meter, args.light)
     if args.json:
         print(json.dumps(data, ensure_ascii=False, indent=2))
     else:
@@ -272,6 +273,7 @@ def _cmd_prefab_billboard(args) -> int:
         print(f"meters : {data.get('projectedWidth')}x{data.get('projectedHeight')}")
         print(f"scale  : {data.get('pixelsPerMeter')} px/m")
         print(f"camera : orthographic")
+        print(f"light  : {data.get('fillLight')}")
         print(f"bytes  : {data.get('bytes')}")
     return 0
 
@@ -849,6 +851,8 @@ def build_parser() -> argparse.ArgumentParser:
                              help="相机相对物体的单位向量，如 '0,0,-1'")
     p_billboard.add_argument("--pixels-per-meter", type=float, default=100.0,
                              help="投影宽高每米对应像素数（默认 100）")
+    p_billboard.add_argument("--light", type=float, default=2.0,
+                             help="与相机同向的平行光强度（默认 2；负数表示不补光）")
     p_billboard.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_billboard.set_defaults(func=_cmd_prefab_billboard)
 

@@ -32,6 +32,7 @@ namespace UnityPythonBridge.Commands
         public float projectedWidth;
         public float projectedHeight;
         public float pixelsPerMeter;
+        public float fillLight;
         public int width;
         public int height;
         public int bytes;
@@ -72,7 +73,7 @@ namespace UnityPythonBridge.Commands
         }
 
         [BridgeCommand("prefab.billboard",
-            "按指定相机相对单位方向正交截取预制体，尺寸由投影 bounds 自动计算。参数: path(string), output(string,输出目录;相对路径基于 Assets), cameraPosition(float[]3,必填单位向量), pixelsPerMeter(float,默认100)")]
+            "按指定相机相对单位方向正交截取预制体，尺寸由投影 bounds 自动计算。参数: path(string), output(string,输出目录;相对路径基于 Assets), cameraPosition(float[]3,必填单位向量), pixelsPerMeter(float,默认100), light(float,默认2;负数=不补光)")]
         public static object Billboard(BridgeContext ctx, BridgeArgs args)
         {
             if (string.IsNullOrWhiteSpace(args.output))
@@ -89,6 +90,7 @@ namespace UnityPythonBridge.Commands
             float ppm = args.pixelsPerMeter > 0f ? args.pixelsPerMeter : 100f;
             if (ppm > 8192f)
                 throw new ArgumentException("pixelsPerMeter 过大（最大 8192）");
+            float lightIntensity = args.light > 0f ? args.light : (args.light < 0f ? 0f : 2f);
 
             GameObject asset;
             string resolved = ResolvePrefab(args.path, out asset);
@@ -98,6 +100,7 @@ namespace UnityPythonBridge.Commands
 
             GameObject instance = null;
             GameObject cameraObject = null;
+            GameObject lightObject = null;
             RenderTexture rt = null;
             Texture2D texture = null;
             try
@@ -154,6 +157,19 @@ namespace UnityPythonBridge.Commands
                 camera.nearClipPlane = 0.01f;
                 camera.farClipPlane = distance * 2f + (maxZ - minZ) + 1f;
 
+                if (lightIntensity > 0f)
+                {
+                    lightObject = new GameObject("BridgeBillboardLight");
+                    var directionalLight = lightObject.AddComponent<Light>();
+                    directionalLight.type = LightType.Directional;
+                    directionalLight.intensity = lightIntensity;
+                    directionalLight.color = Color.white;
+                    directionalLight.shadows = LightShadows.None;
+                    directionalLight.cullingMask = 1 << CaptureLayer;
+                    lightObject.transform.position = cameraPosition;
+                    lightObject.transform.rotation = cameraObject.transform.rotation;
+                }
+
                 rt = RenderTexture.GetTemporary(width, height, 24,
                     RenderTextureFormat.ARGB32, RenderTextureReadWrite.Default);
                 camera.targetTexture = rt;
@@ -179,6 +195,7 @@ namespace UnityPythonBridge.Commands
                     projectedWidth = projectedWidth,
                     projectedHeight = projectedHeight,
                     pixelsPerMeter = ppm,
+                    fillLight = lightIntensity,
                     width = width,
                     height = height,
                     bytes = png.Length,
@@ -189,6 +206,7 @@ namespace UnityPythonBridge.Commands
                 RenderTexture.active = null;
                 if (texture != null) UnityEngine.Object.DestroyImmediate(texture);
                 if (rt != null) RenderTexture.ReleaseTemporary(rt);
+                if (lightObject != null) UnityEngine.Object.DestroyImmediate(lightObject);
                 if (cameraObject != null) UnityEngine.Object.DestroyImmediate(cameraObject);
                 if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
             }
