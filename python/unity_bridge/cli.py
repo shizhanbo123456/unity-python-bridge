@@ -234,6 +234,48 @@ def _cmd_mesh_bounds(args) -> int:
     return 0
 
 
+def _print_bounds(data: dict) -> None:
+    print(f"path  : {data.get('resolvedPath')}")
+    print(f"bounds: {data.get('format')}")
+    mn, mx, sz = data.get("min", {}), data.get("max", {}), data.get("size", {})
+    print(f"  min : ({mn.get('x')}, {mn.get('y')}, {mn.get('z')})")
+    print(f"  max : ({mx.get('x')}, {mx.get('y')}, {mx.get('z')})")
+    print(f"  size: ({sz.get('x')}, {sz.get('y')}, {sz.get('z')})")
+
+
+def _cmd_prefab_bounds(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.prefab_bounds(args.path)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        _print_bounds(data)
+    return 0
+
+
+def _cmd_prefab_billboard(args) -> int:
+    try:
+        direction = [float(x) for x in args.camera_position.replace(",", " ").split()]
+        if len(direction) != 3:
+            raise ValueError("需要 3 个分量")
+    except ValueError as e:
+        print(f"[错误] camera-position 解析失败: {e}", file=sys.stderr)
+        return 1
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.prefab_billboard(args.path, args.output, direction, args.pixels_per_meter)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+    else:
+        print(f"prefab : {data.get('resolvedPath')}")
+        print(f"output : {data.get('output')}")
+        print(f"size   : {data.get('width')}x{data.get('height')} px")
+        print(f"meters : {data.get('projectedWidth')}x{data.get('projectedHeight')}")
+        print(f"scale  : {data.get('pixelsPerMeter')} px/m")
+        print(f"camera : orthographic")
+        print(f"bytes  : {data.get('bytes')}")
+    return 0
+
+
 def _parse_vec3(s: str) -> dict:
     parts = [float(x) for x in s.split(",")]
     if len(parts) != 3:
@@ -790,6 +832,25 @@ def build_parser() -> argparse.ArgumentParser:
                           help="保持 prefab 资产原有旋转计算 AABB（默认 false=建模原始姿态）")
     p_bounds.add_argument("--json", action="store_true", help="输出原始 JSON 而非文本")
     p_bounds.set_defaults(func=_cmd_mesh_bounds)
+
+    p_pbounds = sub.add_parser(
+        "prefab-bounds", aliases=["pbounds"],
+        help="计算预制体内所有网格应用完整层级变换后的 AABB")
+    p_pbounds.add_argument("path", help="Assets 中的 .prefab 路径（可省略 Assets/ 和 .prefab）")
+    p_pbounds.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_pbounds.set_defaults(func=_cmd_prefab_bounds)
+
+    p_billboard = sub.add_parser(
+        "prefab-billboard", aliases=["billboard", "pboard"],
+        help="按相对相机方向正交截取透明背景 billboard")
+    p_billboard.add_argument("path", help="Assets 中的 .prefab 路径（可省略 Assets/ 和 .prefab）")
+    p_billboard.add_argument("output", help="输出目录；相对路径基于 Assets")
+    p_billboard.add_argument("--camera-position", required=True,
+                             help="相机相对物体的单位向量，如 '0,0,-1'")
+    p_billboard.add_argument("--pixels-per-meter", type=float, default=100.0,
+                             help="投影宽高每米对应像素数（默认 100）")
+    p_billboard.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_billboard.set_defaults(func=_cmd_prefab_billboard)
 
     p_shot = sub.add_parser(
         "screenshot", aliases=["shot"],

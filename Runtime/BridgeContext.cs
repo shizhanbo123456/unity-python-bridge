@@ -50,6 +50,8 @@ namespace UnityPythonBridge
         public int height;
         public string bg;
         public float light;
+        /// <summary>prefab.billboard：每米对应的输出像素数，默认 100。</summary>
+        public float pixelsPerMeter;
 
         // ---- terrain 通用 ----
         /// <summary>目标 Terrain 的 GameObject 名称；省略时取场景中第一个 Terrain。</summary>

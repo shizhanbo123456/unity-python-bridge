@@ -160,6 +160,17 @@ class UnityClient:
         """
         return self.call("mesh.bounds", path=path, placed=placed)
 
+    def prefab_bounds(self, path: str) -> dict:
+        """计算预制体所有网格应用完整层级位移、旋转、缩放后的世界 AABB。"""
+        return self.call("prefab.bounds", path=path)
+
+    def prefab_billboard(self, path: str, output: str, camera_position,
+                         pixels_per_meter: float = 100.0) -> dict:
+        """使用正交相机生成透明背景 billboard；相对输出目录基于 Assets。"""
+        return self.call("prefab.billboard", path=path, output=output,
+                         cameraPosition=list(camera_position),
+                         pixelsPerMeter=pixels_per_meter)
+
     def prefab_screenshot(self, path: str, offset: dict, output: str,
                           orthographic: bool = False, fov=None,
                           width: int = 1920, height: int = 1080, bg=None,

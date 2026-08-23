@@ -27,7 +27,7 @@
 **不能。** Unity 编辑器会忽略一切软件注入的鼠标输入（`SetForegroundWindow` 置前、`mouse_event` 点击、`PostMessage` 消息序列都无效，已实测）。`bridge.reload` 是进程内 API（`CompilationPipeline.RequestScriptCompilation`），不依赖输入事件，是自动化编译的正路。
 
 **B3. 怎么确认编译后代码生效？**
-`python -m unity_bridge reload --expect-version <版本号>`——版本不匹配会继续等待，匹配才返回成功；或编译完成后 `version` 查看命令数（如 v1.13.0 = 36 条）。
+`python -m unity_bridge reload --expect-version <版本号>`——版本不匹配会继续等待，匹配才返回成功；或编译完成后 `version` 查看命令数（如 v1.14.0 = 38 条）。
 
 **B4. reload 与「改 Assets 文件自动编译」的关系？**
 Unity 检测到 Assets 下 C# 变化会自动编译，但**失焦时会暂停**，需要窗口获得真实点击焦点才恢复。reload 则是在进程内显式请求编译，配合窗口置前即可全自动。
