@@ -174,6 +174,50 @@ def _cmd_debug_log(args) -> int:
     return 0
 
 
+def _print_play_state(data: dict) -> None:
+    print(f"isPlaying: {data.get('isPlaying')}  isPaused: {data.get('isPaused')}  -> {data.get('message')}")
+
+
+def _cmd_play(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.play()
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_play_state(data)
+    return 0
+
+
+def _cmd_stop(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.stop()
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_play_state(data)
+    return 0
+
+
+def _cmd_pause(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.pause()
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_play_state(data)
+    return 0
+
+
+def _cmd_unpause(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.unpause()
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_play_state(data)
+    return 0
+
+
 def _cmd_debug_log_warning(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.debug_log_warning(args.message)
@@ -792,6 +836,26 @@ def build_parser() -> argparse.ArgumentParser:
     p_reload.add_argument("--interval", type=float, default=1.0,
                           help="轮询间隔秒数（默认 1）")
     p_reload.set_defaults(func=_cmd_reload)
+
+    p_play = sub.add_parser("play", aliases=["pl"],
+                            help="进入 Play Mode（开始运行）")
+    p_play.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_play.set_defaults(func=_cmd_play)
+
+    p_stop = sub.add_parser("stop", aliases=["st"],
+                            help="退出 Play Mode（停止运行；若启用 Reload Domain 将自动恢复桥）")
+    p_stop.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_stop.set_defaults(func=_cmd_stop)
+
+    p_pause = sub.add_parser("pause", aliases=["pa"],
+                             help="暂停 Play Mode 模拟（保持运行中）")
+    p_pause.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_pause.set_defaults(func=_cmd_pause)
+
+    p_unpause = sub.add_parser("unpause", aliases=["unp"],
+                               help="恢复 Play Mode 模拟（取消暂停）")
+    p_unpause.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_unpause.set_defaults(func=_cmd_unpause)
 
     p_dbg = sub.add_parser("debug-log", aliases=["dlog"],
                            help="在 Unity Console 打印一条 Info 日志")

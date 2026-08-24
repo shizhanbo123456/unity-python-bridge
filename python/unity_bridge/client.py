@@ -98,6 +98,22 @@ class UnityClient:
         重编译完成后由 BridgeAutoRestart 自动恢复；调用方应轮询等待恢复。"""
         return self.call("bridge.reload")
 
+    def play(self) -> dict:
+        """进入 Play Mode（开始运行）。返回切换后的 isPlaying/isPaused。"""
+        return self.call("editor.play")
+
+    def stop(self) -> dict:
+        """退出 Play Mode（停止运行）。退出若触发 domain reload，桥会自动恢复。"""
+        return self.call("editor.stop")
+
+    def pause(self) -> dict:
+        """暂停 Play Mode 模拟（保持运行中）。"""
+        return self.call("editor.pause")
+
+    def unpause(self) -> dict:
+        """恢复 Play Mode 模拟（取消暂停）。"""
+        return self.call("editor.unpause")
+
     def debug_log(self, message: str) -> dict:
         """在 Unity Console 打印一条 Info 日志。"""
         return self.call("debug.log", message=message)

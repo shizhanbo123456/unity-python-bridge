@@ -2,7 +2,7 @@
 
 > 本文件是完整的命令参考；**使用方法、架构、配置见 `README.md`**。
 > 命令清单已对照源码（C# `[BridgeCommand]` 反射注册 + Python CLI 封装）逐一核对。
-> 版本：v1.14.1（38 条）｜整理日期：2026-08-23
+> 版本：v1.14.2（42 条）｜整理日期：2026-08-24
 
 ## 全局约定
 
@@ -119,6 +119,20 @@ python -m unity_bridge terrain-list --json
 
 ---
 
+## 八、编辑器 Play Mode 控制（4 条）
+
+> **纯 Editor API，bridge 仓库通用能力，不依赖任何业务项目。** 用于控制 Unity Editor 的 Play Mode（开始 / 停止 / 暂停 / 恢复模拟）。
+> ⚠️ **退出 Play Mode 时**，若 Unity 启用了「Reload Domain」（默认开启），会触发 domain reload，桥服务器会随旧域一起卸载——**由 BridgeAutoRestart 的 watchdog 在数秒内自动恢复**，调用方无需处理（可轮询 `bridge.version` 等待恢复，同 `bridge.reload`）。
+
+| 服务端命令 | CLI（别名） | 关键参数 / 说明 |
+|---|---|---|
+| `editor.play` | `play`（`pl`） | 进入 Play Mode；返回 `{isPlaying, isPaused, message}` |
+| `editor.stop` | `stop`（`st`） | 退出 Play Mode；返回切换后的状态（若触发 domain reload，桥会自动恢复） |
+| `editor.pause` | `pause`（`pa`） | 暂停 Play Mode 模拟（保持运行中）；返回状态 |
+| `editor.unpause` | `unpause`（`unp`） | 恢复 Play Mode 模拟（取消暂停）；返回状态 |
+
+---
+
 ## 常用工作流
 
 ### 造地形（一条龙）
@@ -168,4 +182,14 @@ python -m unity_bridge gameobject-set "Player/Body" --position "0,0,0" --zoom "0
 ```bash
 python -m unity_bridge debug-logs --type error --count 20   # 读最近 20 条错误（含 stackTrace）
 python -m unity_bridge reload --expect-version 1.13.0        # 改完 C# 后触发重编译并等待恢复
+```
+
+### Play Mode 控制（开始 / 暂停 / 恢复 / 停止）
+```bash
+python -m unity_bridge play            # 进入 Play Mode（开始运行）
+python -m unity_bridge pause           # 暂停模拟（保持运行中）
+python -m unity_bridge unpause         # 恢复模拟
+python -m unity_bridge stop            # 退出 Play Mode（若启用 Reload Domain，桥会自动恢复）
+# 也可用 Python API：client.play() / stop() / pause() / unpause()
+
 ```

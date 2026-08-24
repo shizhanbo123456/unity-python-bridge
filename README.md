@@ -4,7 +4,7 @@
 
 **纯 Unity 原生实现**：C# 侧仅使用 Unity 内置 `JsonUtility`（无 Newtonsoft.Json），Python 侧仅使用标准库——**克隆/复制整个仓库文件夹到任意项目的 `Assets/` 下即可使用**，无需安装任何包。
 
-> 📖 **完整命令列表见 [`COMMANDS.md`](COMMANDS.md)**（38 条，按功能分类：系统 / 调试 / 相机截图 / 场景与 Prefab 层级 / 网格 / 物体 / 地形；含全部参数与示例）。本 README 只讲架构、连接、配置与用法。
+> 📖 **完整命令列表见 [`COMMANDS.md`](COMMANDS.md)**（42 条，按功能分类：系统 / 调试 / 相机截图 / 场景与 Prefab 层级 / 网格 / 物体 / 地形 / 编辑器控制；含全部参数与示例）。本 README 只讲架构、连接、配置与用法。
 
 ## 📚 文档导航（按需阅读）
 
@@ -181,7 +181,7 @@ python -m unity_bridge reload --expect-version 1.13.0 --timeout 180 --interval 2
 
 ## 四、命令列表
 
-**完整命令列表（38 条，按功能分类：系统 4 / 调试 5 / 相机截图 3 / 场景与 Prefab 层级 3 / 网格 2 / 物体 2 / 地形 19）见 [`COMMANDS.md`](COMMANDS.md)**，含：服务端命令名、Python CLI 与别名、全部参数、常用工作流示例。
+**完整命令列表（42 条，按功能分类：系统 4 / 调试 5 / 相机截图 3 / 场景与 Prefab 层级 3 / 网格 2 / 物体 2 / 地形 19 / 编辑器控制 4）见 [`COMMANDS.md`](COMMANDS.md)**，含：服务端命令名、Python CLI 与别名、全部参数、常用工作流示例。
 
 快速导航：
 
@@ -194,6 +194,7 @@ python -m unity_bridge reload --expect-version 1.13.0 --timeout 180 --interval 2
 | 网格与资源 | 网格/预制体完整变换包围盒 | `mesh.bounds` `prefab.bounds` |
 | 物体操作 | 读写 active/transform；相对操作 move/rotate/zoom | `gameobject.get/set` |
 | 地形编辑 | 高度/纹理/植被/树木/快照/资源目录 | `terrain.*`（19 条） |
+| 编辑器 Play Mode 控制 | 开始 / 停止 / 暂停 / 恢复 Play Mode（纯 Editor API，通用） | `editor.play` `editor.stop` `editor.pause` `editor.unpause` |
 
 ---
 
@@ -304,6 +305,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │       ├── ViewScreenshotCommand.cs # 命令 view.camera（抓取指定相机实时画面；预留 view.window）
 │       ├── GameObjectCommands.cs   # 命令 gameobject.get / gameobject.set（active/position/rotation/scale + 相对操作 move/rotate/zoom）
 │       ├── SystemCommands.cs       # bridge.ping / bridge.list_commands / bridge.version / bridge.reload
+│       ├── EditorCommands.cs       # editor.play / editor.stop / editor.pause / editor.unpause（Play Mode 控制）
 │       └── DebugCommands.cs        # debug.log / log_warning / log_error / get_logs / log_version
 └── python/                         # Python 侧（无需安装依赖）
     ├── unity_bridge/

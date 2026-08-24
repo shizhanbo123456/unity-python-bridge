@@ -30,8 +30,10 @@ namespace UnityPythonBridge
         ///   v1.12.0 新增 prefab.tree（prefab 资产内部层级树，path 必填；depth 默认完整展开）
         ///   v1.13.0 gameobject.set 新增相对操作 move（position+=）/ rotate（欧拉各分量加、四元数乘）/
         ///          zoom（localScale 各分量乘）
+        ///   v1.14.2 新增 editor.play / editor.stop / editor.pause / editor.unpause
+        ///          （Play Mode 控制，纯 Editor API，bridge 仓库通用能力）
         /// </summary>
-        public const string Version = "1.14.1";
+        public const string Version = "1.14.2";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()
