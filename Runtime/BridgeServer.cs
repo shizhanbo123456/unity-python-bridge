@@ -118,6 +118,23 @@ namespace UnityPythonBridge
             Debug.Log("[UnityPythonBridge] 服务器已停止");
         }
 
+        /// <summary>探测本机端口当前是否可连接（自检用）。失败仅表示未在监听，不抛异常。</summary>
+        public static bool ProbeListening()
+        {
+            try
+            {
+                using (var client = new TcpClient())
+                {
+                    client.Connect(IPAddress.Loopback, Port);
+                    return true;
+                }
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         /// <summary>主线程驱动：每帧刷新命令执行队列（命令由后台线程投递，此处消费）。</summary>
         private static void OnEditorUpdate()
         {
@@ -155,6 +172,10 @@ namespace UnityPythonBridge
                     thread.Start();
                 }
             }
+            catch (ThreadAbortException)
+            {
+                // 域重载时 Unity 中止监听线程属正常流程，不视为错误（finally 负责释放端口）
+            }
             catch (Exception e)
             {
                 Debug.LogError($"[UnityPythonBridge] 监听异常: {e}");
@@ -162,6 +183,9 @@ namespace UnityPythonBridge
             finally
             {
                 _running = false;
+                // 任何退出路径都释放监听 socket，避免残留端口占用导致后续 Start() 撞"地址已被使用"
+                try { _listener?.Stop(); } catch (Exception) { /* 忽略 */ }
+                _listener = null;
             }
         }
 

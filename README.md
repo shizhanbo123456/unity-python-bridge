@@ -71,7 +71,7 @@
    - **BridgeManager 组件（可选）**：场景里新建空物体 → Add Component → 搜索 `Bridge Manager` 挂上，Inspector 会显示「启动/停止服务器」按钮，且**组件被销毁时自动停止服务器**。不挂组件也完全可用（菜单等效，服务器自驱命令队列）。
    - 重复点击「启动」/「停止」不会静默：已运行时再启动、未运行时再停止，会打印 Warning 提示。
 
-> **重编译自动恢复**：服务器状态持久化到 `Library/BridgeServerState.txt`——**触发脚本重编译或重新打开项目后，自动按该状态恢复**（无需手动重启）。菜单 Start/Stop 与组件按钮均会同步写入该状态。
+> **重编译自动恢复**：服务器状态持久化到 `Library/BridgeServerState.txt`——**触发脚本重编译或重新打开项目后，自动按该状态恢复**（无需手动重启）。菜单 Start/Stop 与组件按钮均会同步写入该状态。另有**端口自愈 watchdog**（每 5 秒探测）：状态为"运行中"但端口实际未监听时自动重启（覆盖绑定失败 / 线程崩溃 / 端口冲突等）。
 
 ### 2. Python 侧
 
@@ -285,7 +285,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 ├── bridge.ini                      # 运行时配置：端口 [server] port / 重编译超时 [reload] timeout
 ├── Editor/                         ← 纯编辑器工具（Editor 程序集，不进 Player）
 │   ├── BridgeManagerInspector.cs   # BridgeManager 的 Inspector 按钮 + Tools 菜单快捷入口
-│   └── BridgeAutoRestart.cs        # 服务器状态持久化 + 重编译后自动恢复（时机管理）
+│   └── BridgeAutoRestart.cs        # 服务器状态持久化 + 重编译后自动恢复 + 端口自愈 watchdog（时机管理）
 ├── Runtime/                        ← 桥接层 + 可挂场景组件（Assembly-CSharp，全部 #if UNITY_EDITOR 包裹）
 │   ├── BridgeManager.cs            # 可选场景组件：Inspector 按钮宿主、销毁时自动停服
 │   ├── BridgeCommandAttribute.cs   # [BridgeCommand] 命令特性
