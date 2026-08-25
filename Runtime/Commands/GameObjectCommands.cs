@@ -146,6 +146,71 @@ namespace UnityPythonBridge.Commands
             return BuildState(args.target, go, args.quaternion);
         }
 
+        // ---------- gameobject.instantiate / gameobject.destroy ----------
+
+        [BridgeCommand("gameobject.instantiate",
+            "在场景中实例化 Prefab（支持 Undo）。参数: path(string,必填,Prefab资产路径), target(string,可选,父物体层级路径/名称,空=场景根), " +
+            "name(string,可选), position(float[]3,可选,世界), rotation(float[]3欧拉或4四元数,可选,quaternion=true时按四元数), scale(float[]3,可选), quaternion(bool,可选)")]
+        public static object Instantiate(BridgeContext ctx, BridgeArgs args)
+        {
+            string prefabPath = (args.path ?? "").Replace('\\', '/');
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            if (prefab == null) throw new ArgumentException("找不到 Prefab: " + prefabPath);
+
+            var instance = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+            if (instance == null) throw new InvalidOperationException("实例化失败: " + prefabPath);
+
+            if (!string.IsNullOrWhiteSpace(args.target))
+            {
+                GameObject parent = ResolveTarget(args.target);
+                instance.transform.SetParent(parent.transform, true);
+            }
+            ApplySpawnTransform(instance.transform, args);
+            if (!string.IsNullOrWhiteSpace(args.name))
+                instance.name = args.name;
+            Undo.RegisterCreatedObjectUndo(instance, "UnityBridge gameobject.instantiate");
+
+            return BuildState(BuildPath(instance.transform), instance, args.quaternion);
+        }
+
+        [BridgeCommand("gameobject.destroy",
+            "销毁场景中的 GameObject（支持 Undo）。参数: target(string,必填,层级路径/名称)")]
+        public static object Destroy(BridgeContext ctx, BridgeArgs args)
+        {
+            GameObject go = ResolveTarget(args.target);
+            var state = BuildState(BuildPath(go.transform), go, false);
+            Undo.DestroyObjectImmediate(go);
+            return state;
+        }
+
+        /// <summary>设置实例初始变换（position/rotation/scale；rotation 支持四元数）。相对操作 move/rotate/zoom 由 gameobject.set 负责。</summary>
+        private static void ApplySpawnTransform(Transform tf, BridgeArgs args)
+        {
+            if (args.position != null)
+            {
+                if (args.position.Length != 3) throw new ArgumentException("position 必须是 3 个分量 {x,y,z}");
+                tf.position = new Vector3(args.position[0], args.position[1], args.position[2]);
+            }
+            if (args.rotation != null)
+            {
+                if (args.quaternion)
+                {
+                    if (args.rotation.Length != 4) throw new ArgumentException("quaternion=true 时 rotation 必须是 4 个分量 {x,y,z,w}");
+                    tf.rotation = new Quaternion(args.rotation[0], args.rotation[1], args.rotation[2], args.rotation[3]);
+                }
+                else
+                {
+                    if (args.rotation.Length != 3) throw new ArgumentException("rotation 必须是 3 个分量 {x,y,z}（欧拉角）");
+                    tf.rotation = Quaternion.Euler(args.rotation[0], args.rotation[1], args.rotation[2]);
+                }
+            }
+            if (args.scale != null)
+            {
+                if (args.scale.Length != 3) throw new ArgumentException("scale 必须是 3 个分量 {x,y,z}");
+                tf.localScale = new Vector3(args.scale[0], args.scale[1], args.scale[2]);
+            }
+        }
+
         // ---------- 内部工具 ----------
 
         private static GameObjectStateResult BuildState(string target, GameObject go, bool withQuaternion)
