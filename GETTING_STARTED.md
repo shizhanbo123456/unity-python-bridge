@@ -17,7 +17,7 @@
 ## 2. 这个工具能做什么（一分钟速览）
 
 - **命令行操控 Unity 编辑器**：读场景结构、查资产、算包围盒、截图
-- **物体操作**：`gameobject.get/set` 读写 active/position/rotation/scale（支持 Undo），并有相对操作 `--move`（位移+=）/ `--rotate`（欧拉各分量加、四元数乘）/ `--zoom`（缩放各分量乘）
+- **物体操作**：`gameobject.get/set` 读写 active/position/rotation/scale（支持 Undo），并有相对操作 `--move`（位移+=）/ `--rotate`（欧拉各分量加、四元数乘）/ `--zoom`（缩放各分量乘）；`gameobject.instantiate` / `gameobject.destroy` 在场景中实例化/销毁 Prefab（支持 Undo）；`prefab.edit` / `prefab.remove` / `prefab.instantiate` 直接改并保存 Prefab 资产（不经场景）
 - **场景与 Prefab 层级查看**：`scene.tree` 树状看场景（prefab 实例折叠并标注资产路径，支持深度/起点）；`prefab.tree` 直接看 prefab 资产内部层级；`scene.important_scripts` 一键列出挂有 Manager/Tool 等重要脚本的物体
 - **地形程序化生成**：造山（噪声）、铺纹理、撒植被、种树，一条命令完成
 - **地形快照**：把树木/植被存成 JSON，随时恢复（stash → clear → 截图 → apply）
@@ -31,9 +31,9 @@
 # ① 把 unity-python-bridge/ 整个文件夹放进 Unity 项目的 Assets/ 下
 # ② Unity 里菜单 Tools → Unity Python Bridge → Start Server（看到"监听 127.0.0.1:21927"即成功）
 # ③ 验证（在 python/ 目录下）：
-python -m unity_bridge version      # 能打印 v1.14.1 / 38 命令 = 连通 ✓
+python -m unity_bridge version      # 能打印 v1.14.2 / 47 命令 = 连通 ✓
 python -m unity_bridge tree         # 能看到场景物体树 = 命令可用 ✓
-python -m unity_bridge list         # 命令数=38 = 注册完整 ✓
+python -m unity_bridge list         # 命令数=47 = 注册完整 ✓
 ```
 
 > Windows 下如果 `python` 不在 PATH，用 `py -3 -m unity_bridge ...`。
@@ -65,7 +65,8 @@ python -m unity_bridge list         # 命令数=38 = 注册完整 ✓
 |---|---|---|
 | **只读** | `tree` / `prefab-tree` / `important-scripts` / `bounds` / `terrain-list` / `get_*` / `dlogs` / `version` 等 | 不改变任何东西 |
 | **改场景（可保存）** | `terrain.set_*` / `add_trees` / `clear_trees` / `apply_stash` | 立即生效并标记 dirty，需 Ctrl+S；写入会自动重建地形碰撞体 |
-| **改物体（支持 Undo）** | `gameobject.set` | 编辑器内可 Ctrl+Z 撤销 |
+| **改物体（支持 Undo）** | `gameobject.set` / `gameobject.instantiate` / `gameobject.destroy` | 编辑器内可 Ctrl+Z 撤销 |
+| **改 Prefab 资产（直接保存）** | `prefab.edit` / `prefab.remove` / `prefab.instantiate` | 直接改并保存 .prefab 资产，不经场景；保存后无法用场景 Undo 回退 |
 | **临时隔离（用完销毁）** | `prefab.screenshot` | 复制到 9999 坐标渲染，结束后销毁临时对象，不污染场景 |
 | **仅日志** | `debug.log*` / `debug.log_version` | 只在 Console 打日志 |
 

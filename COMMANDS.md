@@ -2,7 +2,7 @@
 
 > 本文件是完整的命令参考；**使用方法、架构、配置见 `README.md`**。
 > 命令清单已对照源码（C# `[BridgeCommand]` 反射注册 + Python CLI 封装）逐一核对。
-> 版本：v1.14.2（42 条）｜整理日期：2026-08-24
+> 版本：v1.14.2（47 条）｜整理日期：2026-08-27
 
 ## 全局约定
 
@@ -71,14 +71,28 @@ python -m unity_bridge terrain-list --json
 | `mesh.bounds` | `mesh-bounds`（`bounds`） | 计算 mesh/模型/预制体的轴对齐包围盒（AABB，多网格合并）；`path`（Assets 相对路径，可带或不带 `Assets/` 前缀，支持 .mesh/.fbx/.obj/.blend/.prefab）；返回 `min/max/center/size/format` |
 | `prefab.bounds` | `prefab-bounds`（`pbounds`） | 计算 prefab 内全部 MeshFilter/SkinnedMeshRenderer 应用完整父子层级位移、旋转、缩放后的世界 AABB；`path` 可省略 `Assets/` 和 `.prefab`；返回 `min/max/center/size/format` |
 
-## 六、物体操作（2 条）
+## 六、物体操作（4 条）
+
+> `gameobject.instantiate` / `gameobject.destroy` 与下文的 Prefab 资产内部编辑 3 条，原为 workflow 仓库的通用命令，现已提升为 bridge 原生命令（位于 bridge 仓库 `Runtime/Commands/`）。
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `gameobject.get` | `gameobject-get`（`gget`） | 读 active / position(世界) / rotation / scale(localScale)；`target`（层级路径优先，名称兼容，重名报错）、`--quaternion`（同时输出四元数） |
 | `gameobject.set` | `gameobject-set`（`gset`） | 写上述属性（支持 Undo）；`target`、`--active`(-1 不改/0 隐藏/1 激活)、`--position "x,y,z"`、`--rotation "x,y,z"`（`--quaternion` 时 `"x,y,z,w"`）、`--scale "x,y,z"`；**相对操作**（基于当前值，在绝对设置后执行）：`--move "x,y,z"`（position+=）、`--rotate "x,y,z"`（欧拉各分量相加；`--quaternion` 时四元数 `"x,y,z,w"` 与当前相乘）、`--zoom "x,y,z"`（localScale 各分量相乘，如 `"2,1,1"`=x 放大 2 倍） |
+| `gameobject.instantiate` | 无专用子命令（`client.call("gameobject.instantiate")` / 原始 TCP） | 在场景中实例化 Prefab（支持 Undo）；`path`(必填,Prefab 资产路径)、`target`(可选,父物体层级路径/名称,空=场景根)、`name`(可选)、`position`/`rotation`/`scale`/`quaternion`(可选) |
+| `gameobject.destroy` | 无专用子命令（`client.call("gameobject.destroy")` / 原始 TCP） | 销毁场景中的 GameObject（支持 Undo）；`target`(必填,层级路径/名称) |
 
-## 七、地形编辑（19 条）
+## 七、Prefab 资产内部编辑（3 条）
+
+> 这 3 条命令**直接改并保存 Prefab 资产**（不经场景）。它们现位于 bridge 仓库 `Runtime/Commands/PrefabEditCommands.cs`，删除该文件即完整移除，不影响其它命令。
+
+| 服务端命令 | CLI（别名） | 关键参数 / 说明 |
+|---|---|---|
+| `prefab.edit` | 无专用子命令（`client.call("prefab.edit")` / 原始 TCP） | 编辑 Prefab 资产内部物体的 Transform（直接保存资产）；`path`(必填,Prefab 资产路径)、`target`(可选,内部层级路径,空=根)、`position`/`rotation`/`scale`/`move`/`rotate`/`zoom`/`quaternion`（语义同 `gameobject.set`） |
+| `prefab.remove` | 无专用子命令（`client.call("prefab.remove")` / 原始 TCP） | 从 Prefab 资产内部删除物体（直接保存资产）；`path`(必填)、`target`(必填,内部层级路径) |
+| `prefab.instantiate` | 无专用子命令（`client.call("prefab.instantiate")` / 原始 TCP） | 在 Prefab 资产内部实例化另一个 Prefab 为子物体（直接保存资产）；`path`(必填,目标 Prefab)、`output`(必填,子 Prefab 资产路径)、`target`(可选,内部父路径)、`position`/`rotation`/`scale`(可选) |
+
+## 八、地形编辑（19 条）
 
 > **公共参数**：`terrain`(可选) —— 目标 Terrain 名称，省略取场景第一个；区域参数 `xBase`/`zBase`/`width`/`height`(可选) —— 操作区域，省略默认整图。
 
@@ -119,7 +133,7 @@ python -m unity_bridge terrain-list --json
 
 ---
 
-## 八、编辑器 Play Mode 控制（4 条）
+## 九、编辑器 Play Mode 控制（4 条）
 
 > **纯 Editor API，bridge 仓库通用能力，不依赖任何业务项目。** 用于控制 Unity Editor 的 Play Mode（开始 / 停止 / 暂停 / 恢复模拟）。
 > ⚠️ **退出 Play Mode 时**，若 Unity 启用了「Reload Domain」（默认开启），会触发 domain reload，桥服务器会随旧域一起卸载——**由 BridgeAutoRestart 的 watchdog 在数秒内自动恢复**，调用方无需处理（可轮询 `bridge.version` 等待恢复，同 `bridge.reload`）。
