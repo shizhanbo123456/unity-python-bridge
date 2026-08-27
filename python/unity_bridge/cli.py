@@ -401,6 +401,62 @@ def _cmd_view_screenshot(args) -> int:
     return 0
 
 
+def _cmd_view_camera_create(args) -> int:
+    def _vec3(s: str):
+        parts = [float(x) for x in s.replace(",", " ").split()]
+        if len(parts) != 3:
+            raise ValueError("需要 3 个分量，格式 'x,y,z'")
+        return parts
+
+    position = rotation = None
+    try:
+        position = _vec3(args.position) if args.position else None
+        if args.rotation:
+            parts = [float(x) for x in args.rotation.replace(",", " ").split()]
+            if args.quaternion and len(parts) != 4:
+                raise ValueError("quaternion=True 时 rotation 需要 4 个分量 x,y,z,w")
+            if not args.quaternion and len(parts) != 3:
+                raise ValueError("rotation 需要 3 个分量（欧拉角）x,y,z")
+            rotation = parts
+    except ValueError as e:
+        print(f"[错误] position/rotation 解析失败: {e}", file=sys.stderr)
+        return 1
+
+    if not args.output.lower().endswith(".png"):
+        print(f"[错误] output 必须是 .png 文件路径（当前: {args.output}）", file=sys.stderr)
+        return 1
+
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.view_camera_create(
+            output=args.output,
+            position=position,
+            rotation=rotation,
+            orthographic=args.orthographic,
+            fov=args.fov,
+            width=args.width,
+            height=args.height,
+            bg=args.bg,
+            light=args.light,
+            quaternion=args.quaternion,
+        )
+
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+
+    pos = data.get("position", {})
+    rot = data.get("rotationEuler", {})
+    print(f"output : {data.get('output')}")
+    print(f"camera : {data.get('cameraType')}  {data.get('width')}x{data.get('height')}")
+    print(f"pos    : ({pos.get('x')}, {pos.get('y')}, {pos.get('z')})")
+    print(f"rot    : ({rot.get('x')}, {rot.get('y')}, {rot.get('z')})"
+          + ("  [quaternion]" if data.get("quaternion") else ""))
+    light_val = data.get("fillLight", 0)
+    print(f"light  : {light_val if light_val else '无补光'}")
+    print(f"bytes  : {data.get('bytes')}")
+    return 0
+
+
 def _cmd_gameobject_get(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.gameobject_get(args.target, quaternion=args.quaternion)
@@ -955,6 +1011,29 @@ def build_parser() -> argparse.ArgumentParser:
     p_vshot.add_argument("--height", type=int, default=0, help="输出图片高（默认相机当前分辨率）")
     p_vshot.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_vshot.set_defaults(func=_cmd_view_screenshot)
+
+    p_vcc = sub.add_parser(
+        "view-camera-create", aliases=["vcc"],
+        help="临时创建新相机（任意位置/朝向）渲染真实场景并截图，截完立即销毁")
+    p_vcc.add_argument("output", help="PNG 输出路径（必须以 .png 结尾）")
+    p_vcc.add_argument("--position", default=None,
+                       help="相机世界坐标，格式 'x,y,z'（缺省 0,0,0）")
+    p_vcc.add_argument("--rotation", default=None,
+                       help="相机朝向：欧拉角 'x,y,z' 或 quaternion=True 时 'x,y,z,w'（缺省 identity）")
+    p_vcc.add_argument("--quaternion", action="store_true",
+                       help="rotation 以四元数解释（需 4 个分量 x,y,z,w）")
+    p_vcc.add_argument("--orthographic", action="store_true",
+                       help="使用正交相机（默认透视）")
+    p_vcc.add_argument("--fov", type=float, default=None,
+                       help="视野：透视=fieldOfView，正交=orthographicSize（缺省 Unity 默认）")
+    p_vcc.add_argument("--width", type=int, default=1920, help="输出图片宽（默认 1920）")
+    p_vcc.add_argument("--height", type=int, default=1080, help="输出图片高（默认 1080）")
+    p_vcc.add_argument("--bg", default=None,
+                       help="背景色 'r,g,b[,a]'（0~1）；缺省使用场景 Skybox")
+    p_vcc.add_argument("--light", type=float, default=0.0,
+                       help="补光强度（默认 0 不补光；>0 追加与相机同向平行光）")
+    p_vcc.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_vcc.set_defaults(func=_cmd_view_camera_create)
 
     p_gget = sub.add_parser(
         "gameobject-get", aliases=["gget"],

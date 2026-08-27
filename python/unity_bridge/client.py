@@ -364,6 +364,35 @@ class UnityClient:
             args["height"] = height
         return self.call("view.camera", **args)
 
+    def view_camera_create(self, output: str, position=None, rotation=None,
+                           orthographic: bool = False, fov=None,
+                           width: int = 1920, height: int = 1080, bg=None,
+                           light: float = 0.0, quaternion: bool = False) -> dict:
+        """临时创建一个新相机（任意 position/rotation）渲染真实场景并截图保存 PNG，截完立即销毁。
+
+        position 为 [x,y,z] 世界坐标（缺省原点）；rotation 为 [x,y,z] 欧拉角或
+        quaternion=True 时的 [x,y,z,w]；bg 为 "r,g,b[,a]"；fov / bg 为 None 时不发送，
+        由 Unity 侧使用默认值（fov=Unity 默认，bg=场景 Skybox）。
+        """
+        args = {
+            "output": output,
+            "orthographic": orthographic,
+            "width": width,
+            "height": height,
+            "light": light,
+        }
+        if position is not None:
+            args["position"] = list(position)
+        if rotation is not None:
+            args["rotation"] = list(rotation)
+        if quaternion:
+            args["quaternion"] = True
+        if fov is not None:
+            args["fov"] = fov
+        if bg is not None:
+            args["bg"] = bg
+        return self.call("view.camera_create", **args)
+
     # ---- gameobject.get / gameobject.set（常规物体操作）----
 
     def gameobject_get(self, target: str, quaternion: bool = False) -> dict:
