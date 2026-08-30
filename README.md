@@ -104,7 +104,7 @@ python -m unity_bridge gameobject-set "Player/Body" --zoom "2,1,1"         # x �
 
 ### 2.1 MCP 适配器（可选）
 
-MCP 入口复用同一个 `UnityClient` 和 TCP/JSON 服务，Unity 侧无需额外组件。它通过 stdio 向 MCP 客户端暴露经过筛选的只读和低风险工具，不会自动暴露全部 Bridge 命令。
+MCP 入口复用同一个 `UnityClient` 和 TCP/JSON 服务，Unity 侧无需额外组件。它通过 stdio 向 MCP 客户端提供 12 个入口工具：高频操作使用参数明确的强类型工具，`list_unity_commands` + `call_unity_command` 受控网关覆盖 Unity 当前注册的全部 Bridge 命令。
 
 ```bash
 cd python
@@ -118,7 +118,9 @@ python -m unity_bridge.mcp_server
 python scripts/test_mcp_smoke.py
 ```
 
-当前工具包括连通/版本检查、场景树、GameObject 查询和 Transform 修改、Console 日志、Play Mode 进入/退出以及相机截图。Terrain 清空、Prefab 删除等高风险命令不在默认白名单内。
+当前强类型工具包括连通/版本检查、场景树、GameObject 查询和 Transform 修改、Console 日志、Play Mode 进入/退出、相机截图以及编译恢复。其余命令先用 `list_unity_commands` 获取实时目录和参数说明，再由 `call_unity_command` 调用。只读命令可直接执行；Terrain 写入、Prefab 删除等会改变 Unity 状态的命令必须显式传入 `confirm_changes=true`。`bridge.reload` 只能通过专用 `reload_unity` 工具执行，以确保 Domain Reload 后等待服务器恢复。
+
+MCP stdio 进程通常由 Codex、Claude Desktop 等客户端按配置自动启动和关闭，不需要手动常驻运行。Unity Editor 及其 BridgeServer 仍须在线；本项目已启用的 Unity 自动启动/恢复机制可继续使用。
 
 ### 3. 无 Unity 环境联调（可选）
 

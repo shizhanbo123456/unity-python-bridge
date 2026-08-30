@@ -81,3 +81,11 @@ python -m unity_bridge list         # 命令数=47 = 注册完整 ✓
 - 服务器只监听 `127.0.0.1`，不暴露局域网
 - **但任何能访问该端口的本机进程都可以执行任意命令**（包括读取/修改你的场景与资产）——不要让不明来源的脚本在服务器运行时运行
 - 工具定位是 **Editor 开发期工具**，不要在打包后的 Player 中依赖它
+
+## 9. MCP 客户端接入
+
+MCP 是原有 CLI 之外的可选入口。先在 `python/` 目录执行 `python -m pip install -r requirements.txt`，然后把 MCP 客户端配置为以该目录为工作目录、启动 `python -m unity_bridge.mcp_server`。stdio 服务通常由客户端自动启动和关闭，无需手动常驻。
+
+适配器提供高频强类型工具，并通过 `list_unity_commands` 和 `call_unity_command` 覆盖当前全部 Bridge 命令。通用网关的只读命令可直接执行；任何可能修改场景、资产或编辑器状态的命令都要求 `confirm_changes=true`。编译应使用 `reload_unity`，它会等待 Unity Domain Reload 后自动恢复。
+
+保持 Unity Editor 打开且 BridgeServer 在线，然后运行 `python scripts/test_mcp_smoke.py` 可验证 MCP 握手、工具发现和真实 Unity 调用。
