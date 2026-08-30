@@ -102,6 +102,24 @@ python -m unity_bridge gameobject-set "Player/Body" --rotate "0,90,0"      # 欧
 python -m unity_bridge gameobject-set "Player/Body" --zoom "2,1,1"         # x 轴放大 2 倍
 ```
 
+### 2.1 MCP 适配器（可选）
+
+MCP 入口复用同一个 `UnityClient` 和 TCP/JSON 服务，Unity 侧无需额外组件。它通过 stdio 向 MCP 客户端暴露经过筛选的只读和低风险工具，不会自动暴露全部 Bridge 命令。
+
+```bash
+cd python
+python -m pip install -r requirements.txt
+python -m unity_bridge.mcp_server
+```
+
+客户端应以 `python -m unity_bridge.mcp_server` 启动服务，并把工作目录设为本仓库的 `python/`。可用下面的端到端测试验证 MCP 握手、工具发现和真实 Unity 调用：
+
+```bash
+python scripts/test_mcp_smoke.py
+```
+
+当前工具包括连通/版本检查、场景树、GameObject 查询和 Transform 修改、Console 日志、Play Mode 进入/退出以及相机截图。Terrain 清空、Prefab 删除等高风险命令不在默认白名单内。
+
 ### 3. 无 Unity 环境联调（可选）
 
 ```bash
