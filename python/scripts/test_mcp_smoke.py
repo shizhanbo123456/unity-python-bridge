@@ -21,7 +21,14 @@ async def run() -> None:
 
             tools = await session.list_tools()
             names = {tool.name for tool in tools.tools}
-            expected = {"unity_ping", "unity_version", "get_scene_tree"}
+            expected = {
+                "unity_ping",
+                "unity_version",
+                "list_unity_commands",
+                "call_unity_command",
+                "reload_unity",
+                "get_scene_tree",
+            }
             missing = expected - names
             if missing:
                 raise AssertionError(f"MCP tools missing: {sorted(missing)}")
@@ -32,6 +39,28 @@ async def run() -> None:
             payload = json.loads(ping.content[0].text)
             if payload.get("pong") is not True:
                 raise AssertionError(f"unexpected ping result: {payload}")
+
+            catalog_result = await session.call_tool("list_unity_commands")
+            if catalog_result.isError:
+                raise AssertionError(f"list_unity_commands failed: {catalog_result.content}")
+            catalog = json.loads(catalog_result.content[0].text)
+            if catalog.get("count", 0) < 1:
+                raise AssertionError(f"unexpected command catalog: {catalog}")
+
+            generic = await session.call_tool(
+                "call_unity_command",
+                {"command": "bridge.version", "arguments": {}},
+            )
+            if generic.isError:
+                raise AssertionError(f"generic bridge.version failed: {generic.content}")
+            version = json.loads(generic.content[0].text)
+
+            guarded = await session.call_tool(
+                "call_unity_command",
+                {"command": "debug.log", "arguments": {"message": "blocked"}},
+            )
+            if not guarded.isError:
+                raise AssertionError("mutating generic command was not guarded")
 
             tree = await session.call_tool("get_scene_tree", {"depth": 1})
             if tree.isError:
@@ -44,6 +73,8 @@ async def run() -> None:
                 json.dumps(
                     {
                         "toolCount": len(names),
+                        "bridgeCommandCount": catalog["count"],
+                        "bridgeVersion": version.get("version"),
                         "pong": payload["pong"],
                         "scene": scene.get("name"),
                         "rootCount": scene.get("rootCount"),
