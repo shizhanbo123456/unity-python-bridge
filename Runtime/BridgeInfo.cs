@@ -32,8 +32,10 @@ namespace UnityPythonBridge
         ///          zoom（localScale 各分量乘）
         ///   v1.14.2 新增 editor.play / editor.stop / editor.pause / editor.unpause
         ///          （Play Mode 控制，纯 Editor API，bridge 仓库通用能力）
+        ///   v1.15.0 新增 debug.set_log_filter（按子串过滤日志：立即丢弃缓冲中不匹配的日志，
+        ///          后续仅 message 包含该子串的日志进入缓冲；传空清除过滤）
         /// </summary>
-        public const string Version = "1.14.2";
+        public const string Version = "1.15.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

@@ -59,6 +59,7 @@ COMMANDS = [
     {"name": "debug.log_warning", "description": "在 Unity Console 打印一条 Warning 日志。参数: message(string)"},
     {"name": "debug.log_error", "description": "在 Unity Console 打印一条 Error 日志。参数: message(string)"},
     {"name": "debug.get_logs", "description": "读取最近 N 条 Console 日志（环形缓冲）。参数: count(int,可选,默认50), type(string,可选 all/log/warning/error/exception)"},
+    {"name": "debug.set_log_filter", "description": "设置日志过滤子串：立即丢弃缓冲中 message 不含该子串的日志，后续仅匹配的日志入缓冲。参数: substring(string)；传空清除过滤。"},
     {"name": "debug.log_version", "description": "在 Unity Console 打印桥接层版本号（含命令总数）。参数: 无"},
     {"name": "scene.tree", "description": "以树状结构返回当前场景中的物体层级。参数: components(bool)"},
     {"name": "mesh.bounds", "description": "计算 Assets 中网格/模型/预制体的轴对齐包围盒。参数: path(string)"},
@@ -152,6 +153,8 @@ def handle_client(client: socket.socket) -> None:
                             "logged": True}
                 elif cmd == "debug.get_logs":
                     data = mock_get_logs(args)
+                elif cmd == "debug.set_log_filter":
+                    data = mock_set_log_filter(args)
                 elif cmd == "debug.log_version":
                     data = mock_log_version()
                 elif cmd == "bridge.list_commands":
@@ -231,7 +234,13 @@ MOCK_LOG_MAX = 500
 
 
 def mock_append_log(type_: str, message: str) -> None:
-    """把一条日志加入缓冲（模拟 Unity 的 Application.logMessageReceived 回调）。"""
+    """把一条日志加入缓冲（模拟 Unity 的 Application.logMessageReceived 回调）。
+
+    复刻 C# 侧行为：debug.set_log_filter 的过滤子串生效时，
+    message 不含子串的日志直接丢弃（不入缓冲）。
+    """
+    if MOCK_LOG_FILTER is not None and MOCK_LOG_FILTER not in (message or ""):
+        return
     entry = {"index": len(MOCK_LOGS), "time": 0.0,
              "type": type_, "message": message, "stackTrace": ""}
     MOCK_LOGS.append(entry)
@@ -248,6 +257,25 @@ def mock_get_logs(args: dict) -> dict:
     recent = MOCK_LOGS[-count:]
     entries = [e for e in recent if filter_ == "all" or e["type"] == filter_]
     return {"count": len(entries), "entries": entries}
+
+
+# 离线模拟 debug.set_log_filter 的过滤子串（None=未启用）
+MOCK_LOG_FILTER = None
+
+
+def mock_set_log_filter(args: dict) -> dict:
+    """离线模拟 debug.set_log_filter：过滤现有缓冲 + 记录过滤子串。"""
+    global MOCK_LOG_FILTER
+    substring = args.get("substring") or ""
+    if substring == "":
+        MOCK_LOG_FILTER = None
+        return {"filter": "", "active": False,
+                "kept": len(MOCK_LOGS), "removed": 0}
+    MOCK_LOG_FILTER = substring
+    before = len(MOCK_LOGS)
+    MOCK_LOGS[:] = [e for e in MOCK_LOGS if substring in (e.get("message") or "")]
+    return {"filter": substring, "active": True,
+            "kept": len(MOCK_LOGS), "removed": before - len(MOCK_LOGS)}
 
 
 def mock_log_version() -> dict:

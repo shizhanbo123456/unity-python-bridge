@@ -17,6 +17,11 @@ namespace UnityPythonBridge.Commands
         private const int MaxBufferedLogs = 500;
         private static readonly List<LogEntry> _logBuffer = new List<LogEntry>(MaxBufferedLogs);
         private static readonly object _logLock = new object();
+        /// <summary>
+        /// 当前日志过滤子串；null=不过滤。
+        /// 非 null 时：新日志 message 必须包含该子串才进入缓冲（debug.set_log_filter 设置）。
+        /// </summary>
+        private static string _logFilter;
 
         static DebugCommands()
         {
@@ -38,6 +43,9 @@ namespace UnityPythonBridge.Commands
             }
             lock (_logLock)
             {
+                // 过滤子串生效时，message 不含子串的日志直接丢弃（不入缓冲）
+                if (_logFilter != null && (condition == null || !condition.Contains(_logFilter)))
+                    return;
                 _logBuffer.Add(new LogEntry
                 {
                     time = Time.realtimeSinceStartup,
@@ -116,6 +124,43 @@ namespace UnityPythonBridge.Commands
             return new GetLogsResult { count = entries.Count, entries = entries.ToArray() };
         }
 
+        [BridgeCommand("debug.set_log_filter", "设置日志过滤子串：立即丢弃当前缓冲中 message 不含该子串的日志，且后续日志必须包含该子串才入缓冲。参数: substring(string)；传空字符串清除过滤（不清空缓冲）。")]
+        public static object SetLogFilter(BridgeContext ctx, BridgeArgs args)
+        {
+            string substring = args.substring;
+
+            int kept;
+            int removed;
+            bool active;
+            lock (_logLock)
+            {
+                if (string.IsNullOrEmpty(substring))
+                {
+                    // 空子串 = 清除过滤（保留现有缓冲内容不动）
+                    _logFilter = null;
+                    active = false;
+                    kept = _logBuffer.Count;
+                    removed = 0;
+                }
+                else
+                {
+                    _logFilter = substring;
+                    int before = _logBuffer.Count;
+                    _logBuffer.RemoveAll(e => e.message == null || !e.message.Contains(substring));
+                    active = true;
+                    kept = _logBuffer.Count;
+                    removed = before - kept;
+                }
+            }
+            return new SetLogFilterResult
+            {
+                filter = active ? substring : "",
+                active = active,
+                kept = kept,
+                removed = removed,
+            };
+        }
+
         [BridgeCommand("debug.log_version", "在 Unity Console 打印桥接层版本号（含命令总数）。参数: 无")]
         public static object LogVersion(BridgeContext ctx, BridgeArgs args)
         {
@@ -165,6 +210,16 @@ namespace UnityPythonBridge.Commands
     {
         public int count;
         public LogEntryDto[] entries;
+    }
+
+    /// <summary>debug.set_log_filter 返回结构。</summary>
+    [System.Serializable]
+    public class SetLogFilterResult
+    {
+        public string filter;   // 生效的过滤子串（清除时为 ""）
+        public bool active;     // 过滤是否生效
+        public int kept;        // 操作后缓冲内剩余条数
+        public int removed;     // 本次被丢弃的条数（清除过滤时为 0）
     }
 }
 #endif // UNITY_EDITOR

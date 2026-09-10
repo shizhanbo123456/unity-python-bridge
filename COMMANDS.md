@@ -2,7 +2,7 @@
 
 > 本文件是完整的命令参考；**使用方法、架构、配置见 `README.md`**。
 > 命令清单已对照源码（C# `[BridgeCommand]` 反射注册 + Python CLI 封装）逐一核对。
-> 版本：v1.14.2（47 条）｜整理日期：2026-08-27
+> 版本：v1.15.0（48 条）｜整理日期：2026-09-10
 
 ## 全局约定
 
@@ -36,7 +36,7 @@ python -m unity_bridge terrain-list --json
 | `bridge.version` | `version`（`ver`/`v`） | 版本号 + 命令统计（确认 Unity 侧代码是否最新） |
 | `bridge.reload` | `reload`（`rl`） | 触发重编译并轮询等待服务器恢复；`--expect-version`（不匹配继续等）、`--timeout`（总超时，默认读 ini 30s）、`--interval`（轮询间隔，默认 1s） |
 
-## 二、调试与日志（5 条）
+## 二、调试与日志（6 条）
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
@@ -44,6 +44,7 @@ python -m unity_bridge terrain-list --json
 | `debug.log_warning` | `debug-log-warning`（`dlogw`） | Console 打 Warning；`message` |
 | `debug.log_error` | `debug-log-error`（`dloge`） | Console 打 Error；`message` |
 | `debug.get_logs` | `debug-logs`（`dlogs`） | **读回**最近 N 条 Console 日志（环形缓冲 500，自订阅时刻起）；`--count`（默认 50）、`--type`（all/log/warning/error/exception）；返回 `{index, time, type, message, stackTrace}` |
+| `debug.set_log_filter` | `debug-set-log-filter`（`dfilter`） | 设置日志过滤子串：**立即丢弃**当前缓冲中 message 不含该子串的日志，且后续仅 message 包含该子串的日志入缓冲；`substring`（位置参数，传空字符串清除过滤，不清空缓冲）；返回 `{filter, active, kept, removed}` |
 | `debug.log_version` | `debug-log-version`（`dlogv`） | Console 打印桥接层版本号（含命令总数） |
 
 ## 三、相机与截图（3 条）

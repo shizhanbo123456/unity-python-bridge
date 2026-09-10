@@ -260,6 +260,20 @@ def _cmd_debug_log_version(args) -> int:
     return 0
 
 
+def _cmd_debug_set_log_filter(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.set_log_filter(substring=args.substring)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    if data.get("active"):
+        print(f"过滤已启用: 子串='{data.get('filter')}'  保留 {data.get('kept')} 条  丢弃 {data.get('removed')} 条")
+        print("后续仅 message 包含该子串的日志会进入缓冲；传空字符串可清除过滤。")
+    else:
+        print("过滤已清除（缓冲内容未动）。")
+    return 0
+
+
 def _cmd_mesh_bounds(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.mesh_bounds(args.path, placed=args.placed)
@@ -940,6 +954,13 @@ def build_parser() -> argparse.ArgumentParser:
                            help="按类型过滤（默认 all）")
     p_dbglogs.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_dbglogs.set_defaults(func=_cmd_debug_logs)
+
+    p_dbgfilter = sub.add_parser("debug-set-log-filter", aliases=["dfilter"],
+                                 help="设置日志过滤子串（立即丢弃缓冲中不匹配的日志，且后续仅匹配的日志入缓冲）")
+    p_dbgfilter.add_argument("substring", nargs="?", default="",
+                             help="过滤子串（如 SKILL_LOC）；传空字符串清除过滤")
+    p_dbgfilter.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_dbgfilter.set_defaults(func=_cmd_debug_set_log_filter)
 
     p_dbgv = sub.add_parser("debug-log-version", aliases=["dlogv"],
                             help="在 Unity Console 打印桥接层版本号（含命令总数）")

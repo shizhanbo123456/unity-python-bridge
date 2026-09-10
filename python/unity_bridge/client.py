@@ -134,6 +134,16 @@ class UnityClient:
         """
         return self.call("debug.get_logs", count=count, type=type_)
 
+    def set_log_filter(self, substring: str = "") -> dict:
+        """设置日志过滤子串。
+
+        substring 非空：立即丢弃当前缓冲中 message 不含该子串的日志，
+        且后续日志必须包含该子串才会进入缓冲。
+        substring 为空：清除过滤（缓冲内容不动）。
+        返回 {"filter": str, "active": bool, "kept": int, "removed": int}。
+        """
+        return self.call("debug.set_log_filter", substring=substring)
+
     def debug_log_version(self) -> dict:
         """在 Unity Console 打印桥接层版本号（含命令总数）。"""
         return self.call("debug.log_version")
