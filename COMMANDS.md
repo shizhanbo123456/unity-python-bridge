@@ -168,7 +168,7 @@ python -m unity_bridge terrain-list --json
 ### 用这 4 条搭一套 UI Toolkit 载体（完整示例）
 ```bash
 python -m unity_bridge acreate PanelSettings --path "Assets/UI/UITestPanelSettings.asset"
-python -m unity_bridge pset "Assets/UI/UITestPanelSettings.asset" --property themeStyleSheet --value "Assets/UI Toolkit/UnityDefaultRuntimeTheme.tss"
+python -m unity_bridge pset "Assets/UI/UITestPanelSettings.asset" --property themeStyleSheet --value "Assets/UI Toolkit/UnityThemes/UnityDefaultRuntimeTheme.tss"
 python -m unity_bridge gcreate UITest
 python -m unity_bridge cadd UITest --component UIDocument
 python -m unity_bridge pset UITest --component UIDocument --property panelSettings   --value "Assets/UI/UITestPanelSettings.asset"
@@ -177,6 +177,11 @@ python -m unity_bridge view-window out/ui.png
 ```
 
 > uGUI 的 `Canvas` / `CanvasScaler` / `Image` / `EventSystem` 同样用这 4 条即可搭起来，不需要手工摆放。
+>
+> ⚠️ 默认运行时主题由 Unity 自动创建：只要 `asset.create` 建出 `PanelSettings`，Unity 就会在同一步生成
+> `Assets/UI Toolkit/UnityThemes/UnityDefaultRuntimeTheme.tss`（**注意带 `UnityThemes/` 子目录**），
+> 所以上面第 2 行直接引用它即可，不需要手动建主题。
+> 漏接 `themeStyleSheet` 的后果：元素拿不到默认样式（字号/颜色/按钮外观全丢），界面会变成一堆没样式的方块。
 
 ---
 
