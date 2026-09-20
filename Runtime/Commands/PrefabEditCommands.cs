@@ -140,8 +140,10 @@ namespace UnityPythonBridge.Commands
         }
 
         // ---------- 内部工具 ----------
+        // 以下 4 个工具放宽为 internal，供同程序集的 PrefabObjectCommands（prefab.create_object /
+        // create_primitive / add_component / set）复用，避免复制粘贴。
 
-        private static void ApplyTransform(Transform tf, BridgeArgs args)
+        internal static void ApplyTransform(Transform tf, BridgeArgs args)
         {
             if (args.position != null)
             {
@@ -194,7 +196,7 @@ namespace UnityPythonBridge.Commands
         }
 
         /// <summary>解析 Prefab 资产内部子物体：空/根 = 根节点；否则按 '/' 分隔的子路径查找，支持使用子路径。</summary>
-        private static Transform ResolvePrefabChild(Transform root, string target)
+        internal static Transform ResolvePrefabChild(Transform root, string target)
         {
             if (string.IsNullOrWhiteSpace(target)) return root;
             target = target.Trim().Trim('/');
@@ -220,7 +222,7 @@ namespace UnityPythonBridge.Commands
         }
 
         /// <summary>构建从 Prefab 根到目标的相对路径 "Child/SubChild"（根节点返回 ""）。</summary>
-        private static string BuildChildPath(Transform root, Transform target)
+        internal static string BuildChildPath(Transform root, Transform target)
         {
             if (target == root) return "";
             var names = new List<string>();
@@ -234,7 +236,7 @@ namespace UnityPythonBridge.Commands
             return string.Join("/", names);
         }
 
-        private static string NormalizeAssetPath(string path)
+        internal static string NormalizeAssetPath(string path)
         {
             return (path ?? "").Replace('\\', '/');
         }

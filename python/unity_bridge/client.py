@@ -501,6 +501,96 @@ class UnityClient:
         """
         return self.call("asset.create", type=type_, path=path, overwrite=overwrite)
 
+    # ---- 原生几何体 / Prefab 资产内部的对象级编辑 ----
+
+    def gameobject_create_primitive(self, type_: str, name: str = None, target: str = None,
+                                    position=None, rotation=None, scale=None,
+                                    quaternion: bool = False, material: str = None) -> dict:
+        """在场景中创建原生几何体（Cube/Sphere/Plane/Capsule/Cylinder/Quad，支持 Undo）。
+
+        自带 MeshFilter/MeshRenderer，Cube/Sphere/Capsule/Cylinder 还带碰撞体。
+        name 省略时用类型名；material 为 Assets 下的材质路径，赋给 sharedMaterial。
+        """
+        args = {"type": type_}
+        if name:
+            args["name"] = name
+        if target:
+            args["target"] = target
+        if position is not None:
+            args["position"] = list(position)
+        if rotation is not None:
+            args["rotation"] = list(rotation)
+        if scale is not None:
+            args["scale"] = list(scale)
+        if quaternion:
+            args["quaternion"] = True
+        if material:
+            args["material"] = material
+        return self.call("gameobject.create_primitive", **args)
+
+    def prefab_create_object(self, path: str, name: str, target: str = None,
+                             position=None, rotation=None, scale=None,
+                             quaternion: bool = False) -> dict:
+        """在 Prefab 资产内部新建空物体（常作组件载体；直接保存资产）。
+
+        target 为 Prefab 内部父物体路径（省略=根节点），空=根节点。
+        """
+        args = {"path": path, "name": name}
+        if target:
+            args["target"] = target
+        if position is not None:
+            args["position"] = list(position)
+        if rotation is not None:
+            args["rotation"] = list(rotation)
+        if scale is not None:
+            args["scale"] = list(scale)
+        if quaternion:
+            args["quaternion"] = True
+        return self.call("prefab.create_object", **args)
+
+    def prefab_create_primitive(self, path: str, type_: str, target: str = None,
+                                name: str = None, position=None, rotation=None,
+                                scale=None, quaternion: bool = False,
+                                material: str = None) -> dict:
+        """在 Prefab 资产内部创建原生几何体（直接保存资产）。"""
+        args = {"path": path, "type": type_}
+        if target:
+            args["target"] = target
+        if name:
+            args["name"] = name
+        if position is not None:
+            args["position"] = list(position)
+        if rotation is not None:
+            args["rotation"] = list(rotation)
+        if scale is not None:
+            args["scale"] = list(scale)
+        if quaternion:
+            args["quaternion"] = True
+        if material:
+            args["material"] = material
+        return self.call("prefab.create_primitive", **args)
+
+    def prefab_add_component(self, path: str, component: str, target: str = None) -> dict:
+        """给 Prefab 资产内部物体添加组件（直接保存资产；已存在则跳过）。"""
+        args = {"path": path, "component": component}
+        if target:
+            args["target"] = target
+        return self.call("prefab.add_component", **args)
+
+    def prefab_set(self, path: str, property: str, value: str,
+                   component: str = None, target: str = None) -> dict:
+        """写入 Prefab 资产内部物体的属性/字段（直接保存资产）。
+
+        target 为 Prefab 内部物体路径（省略=根节点）；component 省略时对目标物体本身操作。
+        value 的转换规则同 property_set。
+        """
+        args = {"path": path, "property": property, "value": value}
+        if component:
+            args["component"] = component
+        if target:
+            args["target"] = target
+        return self.call("prefab.set", **args)
+
     # ---- 内部 ----
 
     def _ensure_connected(self) -> None:

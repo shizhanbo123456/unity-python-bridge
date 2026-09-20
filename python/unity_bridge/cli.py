@@ -588,13 +588,12 @@ def _print_go_state(data: dict) -> None:
 
 
 def _cmd_gameobject_create(args) -> int:
-    try:
-        position = _parse_vec3(args.position) if args.position else None
-        rotation = _parse_vec3(args.rotation) if args.rotation else None
-        scale = _parse_vec3(args.scale) if args.scale else None
-    except ValueError as e:
-        print(f"[错误] position/rotation/scale 解析失败: {e}", file=sys.stderr)
+    # 修：原用 _parse_vec3 返回 dict，但 C# 侧 position/rotation/scale 是 float[]（FAQ D3），
+    # 且 rotation 被写死 3 个分量导致 --quaternion 无法使用。改用 float 列表解析。
+    parsed = _parse_spawn_vectors(args)
+    if parsed is None:
         return 1
+    position, rotation, scale = parsed
 
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.gameobject_create(args.name, target=args.target,
@@ -644,6 +643,123 @@ def _cmd_asset_create(args) -> int:
     print(f"path   : {data.get('path')}")
     print(f"type   : {data.get('type')}")
     print(f"created: {'是' if data.get('created') else '否'}")
+    return 0
+
+
+def _parse_vec_list(value: str, need: int, label: str):
+    """把 'x,y,z' 解析为 float 列表并校验分量数。
+    注意：float[] 参数必须用这个（返回 list），不能用返回 dict 的 _parse_vec3（FAQ D3）。"""
+    parts = [float(x) for x in value.replace(",", " ").split()]
+    if len(parts) != need:
+        raise ValueError(f"{label} 需要 {need} 个分量，格式 'x,y,z'")
+    return parts
+
+
+def _parse_spawn_vectors(args):
+    """解析 position / rotation / scale（rotation 按 --quaternion 决定 3 或 4 个分量）。
+    返回 (position, rotation, scale)；解析失败则打印错误并返回 None。"""
+    try:
+        position = _parse_vec_list(args.position, 3, "position") if args.position else None
+        scale = _parse_vec_list(args.scale, 3, "scale") if args.scale else None
+        rotation = None
+        if args.rotation:
+            rotation = _parse_vec_list(args.rotation, 4 if args.quaternion else 3, "rotation")
+        return position, rotation, scale
+    except ValueError as e:
+        print(f"[错误] 参数解析失败: {e}", file=sys.stderr)
+        return None
+
+
+def _print_prefab_object(data: dict) -> None:
+    print(f"prefab : {data.get('prefab')}")
+    print(f"target : {data.get('target') or '(根节点)'}")
+    if data.get("type"):
+        print(f"type   : {data.get('type')}")
+    print(f"saved  : {'已写回资产' if data.get('saved') else '未保存'}")
+
+
+def _print_prefab_component(data: dict) -> None:
+    print(f"prefab   : {data.get('prefab')}")
+    print(f"target   : {data.get('target') or '(根节点)'}")
+    print(f"component: {data.get('component')}")
+    print(f"added    : {'是' if data.get('added') else '否（已存在）'}")
+    print(f"saved    : {'已写回资产' if data.get('saved') else '未保存'}")
+
+
+def _cmd_gameobject_create_primitive(args) -> int:
+    parsed = _parse_spawn_vectors(args)
+    if parsed is None:
+        return 1
+    position, rotation, scale = parsed
+
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.gameobject_create_primitive(
+            args.type, name=args.name, target=args.target, position=position,
+            rotation=rotation, scale=scale, quaternion=args.quaternion,
+            material=args.material)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_go_state(data)
+    return 0
+
+
+def _cmd_prefab_create_object(args) -> int:
+    parsed = _parse_spawn_vectors(args)
+    if parsed is None:
+        return 1
+    position, rotation, scale = parsed
+
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.prefab_create_object(
+            args.path, args.name, target=args.target, position=position,
+            rotation=rotation, scale=scale, quaternion=args.quaternion)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_prefab_object(data)
+    return 0
+
+
+def _cmd_prefab_create_primitive(args) -> int:
+    parsed = _parse_spawn_vectors(args)
+    if parsed is None:
+        return 1
+    position, rotation, scale = parsed
+
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.prefab_create_primitive(
+            args.path, args.type, target=args.target, name=args.name,
+            position=position, rotation=rotation, scale=scale,
+            quaternion=args.quaternion, material=args.material)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_prefab_object(data)
+    return 0
+
+
+def _cmd_prefab_add_component(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.prefab_add_component(args.path, args.component, target=args.target)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_prefab_component(data)
+    return 0
+
+
+def _cmd_prefab_set(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.prefab_set(args.path, args.property, args.value,
+                                 component=args.component, target=args.target)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"owner  : {data.get('owner')}")
+    print(f"member : {data.get('property')}  ({data.get('memberKind')} / {data.get('memberType')})")
+    print(f"value  : {data.get('value')}")
+    print(f"saved  : {'已写回资产' if data.get('saved') else '未保存'}")
     return 0
 
 
@@ -1238,6 +1354,68 @@ def build_parser() -> argparse.ArgumentParser:
                            help="已存在时覆盖（默认拒绝覆盖并报错）")
     p_acreate.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_acreate.set_defaults(func=_cmd_asset_create)
+
+    p_gprim = sub.add_parser(
+        "gameobject-create-primitive", aliases=["gprim"],
+        help="在场景中创建原生几何体（Cube/Sphere/Plane/Capsule/Cylinder/Quad）")
+    p_gprim.add_argument("type", help="几何体类型")
+    p_gprim.add_argument("--name", default=None, help="物体名称（省略用类型名）")
+    p_gprim.add_argument("--target", default=None, help="父物体层级路径/名称（省略=场景根）")
+    p_gprim.add_argument("--position", default=None, help="世界坐标 'x,y,z'")
+    p_gprim.add_argument("--rotation", default=None, help="旋转 'x,y,z'（--quaternion 时 'x,y,z,w'）")
+    p_gprim.add_argument("--scale", default=None, help="localScale 'x,y,z'")
+    p_gprim.add_argument("--quaternion", action="store_true", help="rotation 以四元数解释")
+    p_gprim.add_argument("--material", default=None, help="Assets 下的材质路径")
+    p_gprim.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_gprim.set_defaults(func=_cmd_gameobject_create_primitive)
+
+    p_pnew = sub.add_parser(
+        "prefab-create-object", aliases=["pnew"],
+        help="在 Prefab 资产内部新建空物体（组件载体；直接保存资产）")
+    p_pnew.add_argument("path", help="Prefab 资产路径")
+    p_pnew.add_argument("name", help="新物体名称")
+    p_pnew.add_argument("--target", default=None, help="内部父物体路径（省略=根节点）")
+    p_pnew.add_argument("--position", default=None, help="世界坐标 'x,y,z'")
+    p_pnew.add_argument("--rotation", default=None, help="旋转 'x,y,z'（--quaternion 时 'x,y,z,w'）")
+    p_pnew.add_argument("--scale", default=None, help="localScale 'x,y,z'")
+    p_pnew.add_argument("--quaternion", action="store_true", help="rotation 以四元数解释")
+    p_pnew.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_pnew.set_defaults(func=_cmd_prefab_create_object)
+
+    p_pprim = sub.add_parser(
+        "prefab-create-primitive", aliases=["pprim"],
+        help="在 Prefab 资产内部创建原生几何体（直接保存资产）")
+    p_pprim.add_argument("path", help="Prefab 资产路径")
+    p_pprim.add_argument("type", help="几何体类型（Cube/Sphere/Plane/Capsule/Cylinder/Quad）")
+    p_pprim.add_argument("--target", default=None, help="内部父物体路径（省略=根节点）")
+    p_pprim.add_argument("--name", default=None, help="物体名称（省略用类型名）")
+    p_pprim.add_argument("--position", default=None, help="世界坐标 'x,y,z'")
+    p_pprim.add_argument("--rotation", default=None, help="旋转 'x,y,z'（--quaternion 时 'x,y,z,w'）")
+    p_pprim.add_argument("--scale", default=None, help="localScale 'x,y,z'")
+    p_pprim.add_argument("--quaternion", action="store_true", help="rotation 以四元数解释")
+    p_pprim.add_argument("--material", default=None, help="Assets 下的材质路径")
+    p_pprim.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_pprim.set_defaults(func=_cmd_prefab_create_primitive)
+
+    p_padd = sub.add_parser(
+        "prefab-add-component", aliases=["padd"],
+        help="给 Prefab 资产内部物体添加组件（已存在则跳过；直接保存资产）")
+    p_padd.add_argument("path", help="Prefab 资产路径")
+    p_padd.add_argument("--component", required=True, help="组件类型名（简名或全名）")
+    p_padd.add_argument("--target", default=None, help="内部物体路径（省略=根节点）")
+    p_padd.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_padd.set_defaults(func=_cmd_prefab_add_component)
+
+    p_pfset = sub.add_parser(
+        "prefab-set", aliases=["pfset"],
+        help="写入 Prefab 资产内部物体的属性/字段（直接保存资产）")
+    p_pfset.add_argument("path", help="Prefab 资产路径")
+    p_pfset.add_argument("--property", required=True, help="属性名或字段名")
+    p_pfset.add_argument("--value", required=True, help="值（转换规则同 property-set）")
+    p_pfset.add_argument("--component", default=None, help="组件类型名（省略=对目标物体本身操作）")
+    p_pfset.add_argument("--target", default=None, help="内部物体路径（省略=根节点）")
+    p_pfset.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_pfset.set_defaults(func=_cmd_prefab_set)
 
     # ============ Terrain 程序化编辑 ============
 

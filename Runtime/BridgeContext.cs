@@ -109,6 +109,10 @@ namespace UnityPythonBridge
         /// <summary>asset.create：目标资产已存在时是否覆盖（默认 false，存在即报错）。</summary>
         public bool overwrite;
 
+        // ---- gameobject.create_primitive / prefab.create_primitive ----
+        /// <summary>材质资产路径（Assets 下），赋给新建几何体的 Renderer.sharedMaterial；省略则用 Unity 默认材质。</summary>
+        public string material;
+
         // ---- gameobject.get / gameobject.set ----
         /// <summary>目标物体：层级路径（如 "Player/Body"）优先，单个名称兼容（重名时报错）。</summary>
         public string target;

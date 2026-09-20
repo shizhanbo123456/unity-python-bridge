@@ -37,8 +37,11 @@ namespace UnityPythonBridge
         ///   v1.16.0 新增构建类命令 4 条：gameobject.create（建空物体）、component.add（加组件）、
         ///          property.set（按名写属性/字段，值按类型自动转换、引用按资产路径加载）、
         ///          asset.create（反射创建 ScriptableObject 资产）——让 UI 载体能全自动搭起来
+        ///   v1.17.0 新增 Prefab 资产内部的对象级编辑：prefab.create_object（建空物体，作组件载体）、
+        ///          prefab.create_primitive（建原生几何体）、prefab.add_component（加组件）、
+        ///          prefab.set（写属性/字段）；并新增 gameobject.create_primitive（场景内建原生几何体）
         /// </summary>
-        public const string Version = "1.16.0";
+        public const string Version = "1.17.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

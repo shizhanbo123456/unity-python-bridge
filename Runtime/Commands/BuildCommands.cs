@@ -41,6 +41,14 @@ namespace UnityPythonBridge.Commands
         public bool created;
     }
 
+    /// <summary>WriteMember 的结果（内部用，不直接序列化）。</summary>
+    internal sealed class MemberWrite
+    {
+        public string kind;       // property / field / serialized
+        public string typeName;   // 成员类型名
+        public string display;    // 写入后值的字符串表示
+    }
+
     /// <summary>
     /// 构建类命令：给场景物体加组件、往任意对象写属性、反射创建 ScriptableObject 资产。
     ///
@@ -109,51 +117,15 @@ namespace UnityPythonBridge.Commands
 
             var targetObj = ResolvePropertyTarget(args.target);
             var holder = ResolveHolder(targetObj, args.component, args.target);
-            var holderType = holder.GetType();
-
-            // 优先按属性名 / 字段名查（覆盖 panelSettings、visualTreeAsset、scaleMode 这类公共属性）
-            var propInfo = holderType.GetProperty(args.property,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (propInfo != null)
-            {
-                if (!propInfo.CanWrite)
-                    throw new InvalidOperationException("属性 '" + args.property + "' 只读（无 setter），无法写入");
-                var converted = ConvertValue(args.value, propInfo.PropertyType, args.property);
-                Undo.RecordObject(holder, "UnityBridge property.set");
-                propInfo.SetValue(holder, converted);
-                return FinishSet(holder, args, "property", propInfo.PropertyType, converted);
-            }
-
-            var fieldInfo = FindField(holderType, args.property);
-            if (fieldInfo != null)
-            {
-                if (fieldInfo.IsInitOnly || fieldInfo.IsLiteral)
-                    throw new InvalidOperationException("字段 '" + args.property + "' 只读（readonly/const），无法写入");
-                var converted = ConvertValue(args.value, fieldInfo.FieldType, args.property);
-                Undo.RecordObject(holder, "UnityBridge property.set");
-                fieldInfo.SetValue(holder, converted);
-                return FinishSet(holder, args, "field", fieldInfo.FieldType, converted);
-            }
-
-            // 兜底：走 SerializedObject
-            var so = new SerializedObject(holder);
-            var sp = so.FindProperty(args.property);
-            if (sp == null)
-                throw new ArgumentException(
-                    "在 " + holderType.Name + " 上找不到成员 '" + args.property + "'（属性 / 字段 / 序列化字段都没有）");
-
-            SetSerializedProperty(sp, args.value, args.property, holderType);
-            so.ApplyModifiedProperties();
-            EditorUtility.SetDirty(holder);
-
+            var write = WriteMember(holder, args.property, args.value, true);
             return new PropertySetResult
             {
                 target = args.target,
-                owner = holderType.FullName,
+                owner = holder.GetType().FullName,
                 property = args.property,
-                memberKind = "serialized",
-                memberType = sp.propertyType.ToString(),
-                value = args.value,
+                memberKind = write.kind,
+                memberType = write.typeName,
+                value = write.display,
                 saved = SaveIfAsset(holder),
             };
         }
@@ -212,8 +184,9 @@ namespace UnityPythonBridge.Commands
 
         private static readonly Dictionary<string, Type> TypeCache = new Dictionary<string, Type>();
 
-        /// <summary>按类型名找类型：全名优先，其次简名；简名有多个候选时报错并列出。</summary>
-        private static Type ResolveType(string name)
+        /// <summary>按类型名找类型：全名优先，其次简名；简名有多个候选时报错并列出。
+        /// internal：同程序集的 PrefabObjectCommands 复用。</summary>
+        internal static Type ResolveType(string name)
         {
             if (string.IsNullOrWhiteSpace(name)) return null;
             name = name.Trim();
@@ -473,22 +446,111 @@ namespace UnityPythonBridge.Commands
             }
         }
 
-        // ---------- 收尾 ----------
+        // ---------- 成员写入（property.set 与 prefab.set 共用）----------
 
-        private static PropertySetResult FinishSet(UnityEngine.Object holder, BridgeArgs args,
-            string kind, Type memberType, object converted)
+        /// <summary>
+        /// 把字符串值写进 holder 的指定成员。查找顺序：属性 → 字段（沿继承链）→ SerializedObject。
+        /// recordUndo=false 用于编辑 Prefab 内容：那批对象是 LoadPrefabContents 出来的临时对象，
+        /// 不该进场景 Undo，也不该标 dirty（改动由 SaveAsPrefabAsset 统一写回资产）。
+        /// </summary>
+        internal static MemberWrite WriteMember(UnityEngine.Object holder, string memberName,
+            string rawValue, bool recordUndo)
         {
-            EditorUtility.SetDirty(holder);
-            return new PropertySetResult
+            var holderType = holder.GetType();
+
+            var propInfo = holderType.GetProperty(memberName,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (propInfo != null)
             {
-                target = args.target,
-                owner = holder.GetType().FullName,
-                property = args.property,
-                memberKind = kind,
-                memberType = memberType.Name,
-                value = Describe(converted),
-                saved = SaveIfAsset(holder),
+                if (!propInfo.CanWrite)
+                    throw new InvalidOperationException("属性 '" + memberName + "' 只读（无 setter），无法写入");
+                var converted = ConvertValue(rawValue, propInfo.PropertyType, memberName);
+                if (recordUndo) Undo.RecordObject(holder, "UnityBridge property.set");
+                propInfo.SetValue(holder, converted);
+                if (recordUndo) EditorUtility.SetDirty(holder);
+                return new MemberWrite
+                {
+                    kind = "property",
+                    typeName = propInfo.PropertyType.Name,
+                    display = Describe(converted),
+                };
+            }
+
+            var fieldInfo = FindField(holderType, memberName);
+            if (fieldInfo != null)
+            {
+                if (fieldInfo.IsInitOnly || fieldInfo.IsLiteral)
+                    throw new InvalidOperationException("字段 '" + memberName + "' 只读（readonly/const），无法写入");
+                var converted = ConvertValue(rawValue, fieldInfo.FieldType, memberName);
+                if (recordUndo) Undo.RecordObject(holder, "UnityBridge property.set");
+                fieldInfo.SetValue(holder, converted);
+                if (recordUndo) EditorUtility.SetDirty(holder);
+                return new MemberWrite
+                {
+                    kind = "field",
+                    typeName = fieldInfo.FieldType.Name,
+                    display = Describe(converted),
+                };
+            }
+
+            var so = new SerializedObject(holder);
+            var sp = so.FindProperty(memberName);
+            if (sp == null)
+                throw new ArgumentException(
+                    "在 " + holderType.Name + " 上找不到成员 '" + memberName + "'（属性 / 字段 / 序列化字段都没有）");
+
+            SetSerializedProperty(sp, rawValue, memberName, holderType);
+            so.ApplyModifiedProperties();
+            if (recordUndo) EditorUtility.SetDirty(holder);
+
+            return new MemberWrite
+            {
+                kind = "serialized",
+                typeName = sp.propertyType.ToString(),
+                display = rawValue,
             };
+        }
+
+        // ---------- 原生几何体共用工具 ----------
+
+        /// <summary>解析几何体类型名（Cube / Sphere / Plane / Capsule / Cylinder / Quad，忽略大小写）。</summary>
+        internal static PrimitiveType ParsePrimitiveType(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("需要参数 type（几何体类型）: " +
+                    string.Join(" / ", Enum.GetNames(typeof(PrimitiveType))));
+            try
+            {
+                return (PrimitiveType)Enum.Parse(typeof(PrimitiveType), name.Trim(), true);
+            }
+            catch (Exception)
+            {
+                throw new ArgumentException("未知的几何体类型 '" + name + "'，可选: " +
+                    string.Join(" / ", Enum.GetNames(typeof(PrimitiveType))));
+            }
+        }
+
+        /// <summary>按 Assets 路径加载材质；路径为空返回 null。
+        /// 应在创建物体【之前】调用——否则失败时会在场景里留下垃圾物体。</summary>
+        internal static Material LoadMaterial(string materialPath)
+        {
+            if (string.IsNullOrWhiteSpace(materialPath)) return null;
+
+            var p = materialPath.Replace('\\', '/').Trim();
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(p);
+            if (mat == null) throw new ArgumentException("找不到材质: " + p);
+            return mat;
+        }
+
+        /// <summary>把材质赋给物体的 Renderer（sharedMaterial）；mat 为 null 则不改。</summary>
+        internal static void ApplyMaterial(GameObject go, Material mat)
+        {
+            if (mat == null) return;
+
+            var renderer = go.GetComponent<Renderer>();
+            if (renderer == null)
+                throw new InvalidOperationException("物体 '" + go.name + "' 上没有 Renderer，无法赋材质");
+            renderer.sharedMaterial = mat;
         }
 
         private static string Describe(object v)

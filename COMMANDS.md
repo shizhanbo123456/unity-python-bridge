@@ -87,15 +87,27 @@ python -m unity_bridge terrain-list --json
 | `gameobject.instantiate` | 无专用子命令（`client.call("gameobject.instantiate")` / 原始 TCP） | 在场景中实例化 Prefab（支持 Undo）；`path`(必填,Prefab 资产路径)、`target`(可选,父物体层级路径/名称,空=场景根)、`name`(可选)、`position`/`rotation`/`scale`/`quaternion`(可选) |
 | `gameobject.destroy` | 无专用子命令（`client.call("gameobject.destroy")` / 原始 TCP） | 销毁场景中的 GameObject（支持 Undo）；`target`(必填,层级路径/名称) |
 
-## 七、Prefab 资产内部编辑（3 条）
+## 七、Prefab 资产内部编辑（7 条）
 
-> 这 3 条命令**直接改并保存 Prefab 资产**（不经场景）。它们现位于 bridge 仓库 `Runtime/Commands/PrefabEditCommands.cs`，删除该文件即完整移除，不影响其它命令。
+> 这 7 条命令**直接改并保存 Prefab 资产**（不经场景，**不能用场景 Ctrl+Z 回退**）。
+> `prefab.edit` / `remove` / `instantiate` 位于 `Runtime/Commands/PrefabEditCommands.cs`；
+> `prefab.create_object` / `create_primitive` / `add_component` / `set` 位于 `Runtime/Commands/PrefabObjectCommands.cs`。
+> 全部命令的 `target` 统一为「Prefab **内部**相对路径」，空 = 根节点。
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `prefab.edit` | 无专用子命令（`client.call("prefab.edit")` / 原始 TCP） | 编辑 Prefab 资产内部物体的 Transform（直接保存资产）；`path`(必填,Prefab 资产路径)、`target`(可选,内部层级路径,空=根)、`position`/`rotation`/`scale`/`move`/`rotate`/`zoom`/`quaternion`（语义同 `gameobject.set`） |
 | `prefab.remove` | 无专用子命令（`client.call("prefab.remove")` / 原始 TCP） | 从 Prefab 资产内部删除物体（直接保存资产）；`path`(必填)、`target`(必填,内部层级路径) |
 | `prefab.instantiate` | 无专用子命令（`client.call("prefab.instantiate")` / 原始 TCP） | 在 Prefab 资产内部实例化另一个 Prefab 为子物体（直接保存资产）；`path`(必填,目标 Prefab)、`output`(必填,子 Prefab 资产路径)、`target`(可选,内部父路径)、`position`/`rotation`/`scale`(可选) |
+| `prefab.create_object` | `prefab-create-object`（`pnew`） | 在 Prefab 内部**新建空物体**（常作组件载体；直接保存资产）。`path`、`name`(必填)、`target`(可选,内部父路径)、`position`/`rotation`/`scale`/`quaternion` |
+| `prefab.create_primitive` | `prefab-create-primitive`（`pprim`） | 在 Prefab 内部**创建原生几何体**（自带 MeshFilter/MeshRenderer 与碰撞体）。`path`、`type`(Cube/Sphere/Plane/Capsule/Cylinder/Quad)、`target`、`--name`、`position`/`rotation`/`scale`/`quaternion`、`--material`(Assets 材质路径) |
+| `prefab.add_component` | `prefab-add-component`（`padd`） | 给 Prefab 内部物体**加组件**（**已存在则跳过**，返回 `added=false`）。`path`、`--component`(简名或全名)、`target` |
+| `prefab.set` | `prefab-set`（`pfset`） | 写入 Prefab 内部物体的**属性/字段**。`path`、`--property`、`--value`(转换规则同 `property.set`)、`--component`(可选)、`target` |
+
+> ⚠️ **已知副作用**：`prefab.create_object` / `prefab.create_primitive` 可能把你**当前打开的场景标为"已修改"**（内容其实没变）。
+> 原因：Unity 没有「直接往指定场景里造物体」的公开 API，只能先 `new` 出来（落点必然是活动场景）再搬进 Prefab 的预览场景。
+> 按 Ctrl+S 存一下、或直接忽略即可，不影响实际内容。
+
 
 ## 八、地形编辑（19 条）
 
@@ -152,15 +164,17 @@ python -m unity_bridge terrain-list --json
 
 ---
 
-## 十、构建类命令（4 条）
+## 十、构建类命令（5 条）
 
 > 补上"桥只能实例化已有 Prefab、只能改 Transform 的 position/rotation/scale"的短板——
-> 有了这 4 条，物体 / 组件 / 资产都能从命令行从零搭出来（UI 载体、uGUI 层级都适用）。
+> 有了这几条，物体 / 组件 / 资产都能从命令行从零搭出来（UI 载体、uGUI 层级、场景几何体都适用）。
+> 预制体资产**内部**的对象级编辑见[第七章](#七prefab-资产内部编辑7-条)。
 > `property.set` 的 `target`：以 `Assets/` 或 `Packages/` 开头按**资产**解析，否则按**场景物体层级路径**解析。
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `gameobject.create` | `gameobject-create`（`gcreate`） | 场景中新建**空物体**（支持 Undo）。`name`(必填)、`--target`(父物体层级路径，空=场景根)、`--position`(世界)、`--rotation`(欧拉，`--quaternion` 时四元数)、`--scale` |
+| `gameobject.create_primitive` | `gameobject-create-primitive`（`gprim`） | 场景中创建**原生几何体**（自带 MeshFilter/MeshRenderer，Cube/Sphere/Capsule/Cylinder 还带碰撞体；支持 Undo）。`type`(Cube/Sphere/Plane/Capsule/Cylinder/Quad)、`--name`(省略用类型名)、`--target`、`--position`/`--rotation`/`--scale`/`--quaternion`、`--material`(Assets 材质路径) |
 | `component.add` | `component-add`（`cadd`） | 给场景物体**加组件**（支持 Undo；**已存在则跳过不报错**，返回 `added=false`）。`target`、`--component`（类型名，简名 `UIDocument` 或全名 `UnityEngine.UIElements.UIDocument` 均可） |
 | `property.set` | `property-set`（`pset`） | 按名**写入属性/字段**（支持 Undo；**资产目标会 SaveAssets 落盘**）。`target`、`--component`(可选，省略=对 target 本身操作)、`--property`(属性名 / 字段名 / `m_Xxx` 序列化字段)、`--value`。值按成员真实类型自动转换：bool 收 `true/false/1/0`；枚举收名字；`Vector`/`Color` 收 `"x,y,z"`；**引用类型收 Assets 路径**；字面量 `null` 置空。返回 `memberKind`(property/field/serialized) 与实际写入值 |
 | `asset.create` | `asset-create`（`acreate`） | 反射创建 **ScriptableObject 资产**（如 `PanelSettings`）。`type`(简名或全名)、`--path`(必须 `Assets/` 开头)、`--overwrite`(默认拒绝覆盖并报错) |

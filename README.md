@@ -193,7 +193,8 @@ python -m unity_bridge reload --expect-version 1.13.0 --timeout 180 --interval 2
 | 场景与 Prefab 层级 | 场景物体树（prefab 备注资产路径）/ 重要脚本 / prefab 资产内部层级 | `scene.tree` `scene.important_scripts` `prefab.tree` |
 | 网格与资源 | 网格/预制体完整变换包围盒 | `mesh.bounds` `prefab.bounds` |
 | 物体操作 | 读写 active/transform；相对操作 move/rotate/zoom；场景实例化/销毁（支持 Undo） | `gameobject.get/set/instantiate/destroy` |
-| 构建类 | 新建空物体、加组件、按名写属性/字段、反射创建 ScriptableObject 资产 | `gameobject.create` `component.add` `property.set` `asset.create` |
+| 构建类 | 建空物体、建原生几何体、加组件、按名写属性/字段、反射创建 ScriptableObject 资产 | `gameobject.create` `gameobject.create_primitive` `component.add` `property.set` `asset.create` |
+| Prefab 资产内部编辑 | 改 Transform、删物体、内嵌子 Prefab；新建物体/几何体、加组件、写属性 | `prefab.edit/remove/instantiate/create_object/create_primitive/add_component/set` |
 | Prefab 资产内部编辑 | 直接改并保存 prefab 资产（不经场景） | `prefab.edit/remove/instantiate` |
 | 地形编辑 | 高度/纹理/植被/树木/快照/资源目录 | `terrain.*`（19 条） |
 | 编辑器 Play Mode 控制 | 开始 / 停止 / 暂停 / 恢复 Play Mode（纯 Editor API，通用） | `editor.play` `editor.stop` `editor.pause` `editor.unpause` |
@@ -304,6 +305,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │       ├── PrefabScreenshotCommand.cs  # 命令 prefab.screenshot（隔离复制+相机截图，支持 camPos/lookAt）
 │       ├── PrefabBillboardCommand.cs   # 命令 prefab.billboard（自动尺寸正交 billboard）+ prefab.bounds（prefab 内完整变换世界 AABB）
 │       ├── PrefabEditCommands.cs   # 命令 prefab.edit / prefab.remove / prefab.instantiate（Prefab 资产内部编辑，直接改并保存资产）
+│       ├── PrefabObjectCommands.cs # 命令 prefab.create_object / prefab.create_primitive / prefab.add_component / prefab.set（Prefab 内部建物体与几何体、加组件、写属性）
 │       ├── TerrainCommands.cs      # 命令 terrain.*（高度图/纹理/植被/树木/快照/资源目录审计，Unity 原生 TerrainData）
 │       ├── TerrainStashCommands.cs # 命令 terrain.stash / apply_stash / stash_delete / stash_list（快照 JSON）
 │       ├── ViewScreenshotCommand.cs # 命令 view.camera（抓取指定相机实时画面）
@@ -335,4 +337,4 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 - 若要在打包后的 Player 中使用，请自行评估：本项目针对 **Editor 开发期工具** 场景。
 - **首次导入后**：Unity 会为脚本生成 `.meta` 文件（GUID）。若希望跨项目复制时保持 GUID 稳定（推荐），请把生成的 `.meta` 一并提交到 git。
 - **自动化编译**：`bridge.reload` 是进程内 API，可稳定触发重编译（需 Unity 前台）；**模拟鼠标点击对 Unity 编辑器无效**（编辑器忽略注入输入），不要走那条路。
-- **版本演进**（当前 v1.16.0）：v1.0.0=独立重构（JsonUtility，5 条命令）→ v1.1.0=新增 12 条 terrain 命令 → v1.2.0=修复 list_commands 序列化 + 版本工具 → v1.3.0=新增 terrain.stash 四命令、view.camera、gameobject.get/set → v1.4.0=新增 debug.get_logs → v1.5.0=新增 debug.log_version → v1.6.0=版本号维护 → v1.7.0=服务器重复启动/停止打印 Warning → v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标 → v1.9.0=新增 scene.important_scripts → v1.10.0=scene.tree 遇到 prefab 实例根不展开 → v1.11.0=scene.tree 新增 depth/path → v1.12.0=新增 prefab.tree → v1.13.0=gameobject.set 新增相对操作 → v1.14.0=新增 prefab.bounds 与自动尺寸正交 prefab.billboard → v1.14.1=prefab.billboard 默认添加强度 2 的相机同向平行光并支持 light 参数 → v1.14.2=新增 editor.play/editor.stop/editor.pause/editor.unpause（Play Mode 控制，纯 Editor API，bridge 仓库通用能力）→ v1.15.0=新增 view.window（抓 Game 视图最终呈现，含 uGUI / UI Toolkit 的 Overlay UI）→ v1.16.0=新增构建类命令 4 条（gameobject.create / component.add / property.set / asset.create，让 UI 载体能全自动搭起来）。可用 `python -m unity_bridge version` 或 `debug-log-version` 确认当前版本。
+- **版本演进**（当前 v1.17.0）：v1.0.0=独立重构（JsonUtility，5 条命令）→ v1.1.0=新增 12 条 terrain 命令 → v1.2.0=修复 list_commands 序列化 + 版本工具 → v1.3.0=新增 terrain.stash 四命令、view.camera、gameobject.get/set → v1.4.0=新增 debug.get_logs → v1.5.0=新增 debug.log_version → v1.6.0=版本号维护 → v1.7.0=服务器重复启动/停止打印 Warning → v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标 → v1.9.0=新增 scene.important_scripts → v1.10.0=scene.tree 遇到 prefab 实例根不展开 → v1.11.0=scene.tree 新增 depth/path → v1.12.0=新增 prefab.tree → v1.13.0=gameobject.set 新增相对操作 → v1.14.0=新增 prefab.bounds 与自动尺寸正交 prefab.billboard → v1.14.1=prefab.billboard 默认添加强度 2 的相机同向平行光并支持 light 参数 → v1.14.2=新增 editor.play/editor.stop/editor.pause/editor.unpause（Play Mode 控制，纯 Editor API，bridge 仓库通用能力）→ v1.15.0=新增 view.window（抓 Game 视图最终呈现，含 uGUI / UI Toolkit 的 Overlay UI）→ v1.16.0=新增构建类命令 4 条（gameobject.create / component.add / property.set / asset.create，让 UI 载体能全自动搭起来）→ v1.17.0=新增 Prefab 内部对象级编辑 4 条（prefab.create_object / create_primitive / add_component / set）与 gameobject.create_primitive（场景内建原生几何体）。可用 `python -m unity_bridge version` 或 `debug-log-version` 确认当前版本。

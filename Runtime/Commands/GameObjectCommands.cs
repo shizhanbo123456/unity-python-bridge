@@ -170,6 +170,33 @@ namespace UnityPythonBridge.Commands
             return BuildState(BuildPath(go.transform), go, args.quaternion);
         }
 
+        // ---------- gameobject.create_primitive ----------
+
+        [BridgeCommand("gameobject.create_primitive",
+            "在场景中创建原生几何体（自带 MeshFilter/MeshRenderer，Cube/Sphere/Capsule/Cylinder 还带碰撞体；支持 Undo）。参数: " +
+            "type(string,必填,Cube/Sphere/Plane/Capsule/Cylinder/Quad), name(string,可选,默认用类型名), " +
+            "target(string,可选,父物体层级路径/名称,空=场景根), position(float[]3,可选,世界), " +
+            "rotation(float[]3欧拉或4四元数,可选,quaternion=true时按四元数), scale(float[]3,可选), " +
+            "material(string,可选,Assets 下的材质路径,赋给 sharedMaterial)")]
+        public static object CreatePrimitive(BridgeContext ctx, BridgeArgs args)
+        {
+            var primitiveType = BuildCommands.ParsePrimitiveType(args.type);
+            var material = BuildCommands.LoadMaterial(args.material);   // 先校验，避免失败后留下垃圾物体
+            var go = GameObject.CreatePrimitive(primitiveType);
+            Undo.RegisterCreatedObjectUndo(go, "UnityBridge gameobject.create_primitive");
+
+            if (!string.IsNullOrWhiteSpace(args.name)) go.name = args.name;
+            if (!string.IsNullOrWhiteSpace(args.target))
+            {
+                var parent = ResolveTarget(args.target);
+                go.transform.SetParent(parent.transform, false);
+            }
+            ApplySpawnTransform(go.transform, args);
+            BuildCommands.ApplyMaterial(go, material);
+
+            return BuildState(BuildPath(go.transform), go, args.quaternion);
+        }
+
         // ---------- gameobject.instantiate / gameobject.destroy ----------
 
         [BridgeCommand("gameobject.instantiate",
