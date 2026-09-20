@@ -32,8 +32,13 @@ namespace UnityPythonBridge
         ///          zoom（localScale 各分量乘）
         ///   v1.14.2 新增 editor.play / editor.stop / editor.pause / editor.unpause
         ///          （Play Mode 控制，纯 Editor API，bridge 仓库通用能力）
+        ///   v1.15.0 新增 view.window（抓 Game 视图最终呈现，含 uGUI / UI Toolkit 的 Overlay UI；
+        ///          ScreenCapture 在帧末异步落盘，调用方需等待文件）
+        ///   v1.16.0 新增构建类命令 4 条：gameobject.create（建空物体）、component.add（加组件）、
+        ///          property.set（按名写属性/字段，值按类型自动转换、引用按资产路径加载）、
+        ///          asset.create（反射创建 ScriptableObject 资产）——让 UI 载体能全自动搭起来
         /// </summary>
-        public const string Version = "1.14.2";
+        public const string Version = "1.16.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

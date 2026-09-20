@@ -393,6 +393,20 @@ class UnityClient:
             args["bg"] = bg
         return self.call("view.camera_create", **args)
 
+    # ---- view.window（抓 Game 视图最终呈现，含 Overlay UI）----
+
+    def view_window(self, output: str, super_size: int = 1) -> dict:
+        """请求抓取 Game 视图的最终呈现（含 uGUI / UI Toolkit 的 Overlay UI）保存为 PNG。
+
+        与 view_screenshot 的区别：view_screenshot 抓的是某个相机的渲染输出，看不到
+        Overlay 界面；本命令抓的是合成后的画面。
+
+        注意：Unity 侧用 ScreenCapture 在帧末异步写入文件，本方法返回时文件通常尚未
+        生成，调用方需要等待（CLI 的 view-window 子命令已内置轮询）。
+        super_size 为分辨率倍数（1~4），输出分辨率 = Game 视图分辨率 * super_size。
+        """
+        return self.call("view.window", output=output, superSize=super_size)
+
     # ---- gameobject.get / gameobject.set（常规物体操作）----
 
     def gameobject_get(self, target: str, quaternion: bool = False) -> dict:
@@ -435,6 +449,57 @@ class UnityClient:
         if quaternion:
             args["quaternion"] = True
         return self.call("gameobject.set", **args)
+
+    # ---- 构建类：gameobject.create / component.add / property.set / asset.create ----
+
+    def gameobject_create(self, name: str, target: str = None,
+                          position=None, rotation=None, scale=None,
+                          quaternion: bool = False) -> dict:
+        """在场景中新建空物体（支持 Undo）。
+
+        name 为新物体名称；target 为父物体层级路径/名称（省略则挂到场景根）。
+        position 为世界坐标 [x,y,z]；rotation 为欧拉角 [x,y,z] 或 quaternion=True 时 [x,y,z,w]。
+        """
+        args = {"name": name}
+        if target:
+            args["target"] = target
+        if position is not None:
+            args["position"] = list(position)
+        if rotation is not None:
+            args["rotation"] = list(rotation)
+        if scale is not None:
+            args["scale"] = list(scale)
+        if quaternion:
+            args["quaternion"] = True
+        return self.call("gameobject.create", **args)
+
+    def component_add(self, target: str, component: str) -> dict:
+        """给场景物体添加组件（已存在则跳过并返回 added=false）。
+
+        component 支持简名（UIDocument）或全名（UnityEngine.UIElements.UIDocument）。
+        """
+        return self.call("component.add", target=target, component=component)
+
+    def property_set(self, target: str, property: str, value: str,
+                     component: str = None) -> dict:
+        """按名字写入对象的属性或字段。
+
+        target 以 Assets/ 或 Packages/ 开头按资产解析，否则按场景物体层级路径解析。
+        component 省略时直接对 target 本身操作；target 是资产时不能指定 component。
+        value 按成员真实类型自动转换：bool 收 true/false/1/0、枚举收名字、
+        Vector/Color 收 "x,y,z"、引用类型收 Assets 路径、字面量 "null" 置空。
+        """
+        args = {"target": target, "property": property, "value": value}
+        if component:
+            args["component"] = component
+        return self.call("property.set", **args)
+
+    def asset_create(self, type_: str, path: str, overwrite: bool = False) -> dict:
+        """反射创建一个 ScriptableObject 资产（如 PanelSettings）到 Assets 下。
+
+        type_ 为类型名（简名或全名）；path 必须以 Assets/ 开头；已存在且 overwrite=False 时报错。
+        """
+        return self.call("asset.create", type=type_, path=path, overwrite=overwrite)
 
     # ---- 内部 ----
 

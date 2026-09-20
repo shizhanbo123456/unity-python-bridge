@@ -27,7 +27,10 @@ namespace UnityPythonBridge.Commands
     ///
     /// 命名约定（view.* 系列）：
     ///   view.camera  - 渲染指定相机的画面（本命令）
-    ///   view.window  - 【预留】截取 Unity 界面 Scene/Game 窗口的最终呈现内容（含 UI/叠加层），后续按需实现
+    ///   view.window  - 抓 Game 视图最终呈现（含 UI 叠加层），见 ViewWindowCommand.cs
+    ///
+    /// 注意：相机看不见 Screen Space Overlay 的 uGUI Canvas 与 UI Toolkit 面板，
+    ///       要截这类界面请用 view.window。
     ///
     /// 参数（BridgeArgs）:
     ///   camera (string, 可选) - 相机 GameObject 名称；省略时依次找 tag=MainCamera、名为 "Main Camera" 的、

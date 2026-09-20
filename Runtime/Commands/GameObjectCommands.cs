@@ -146,6 +146,30 @@ namespace UnityPythonBridge.Commands
             return BuildState(args.target, go, args.quaternion);
         }
 
+        // ---------- gameobject.create ----------
+
+        [BridgeCommand("gameobject.create",
+            "在场景中新建空物体（支持 Undo）。参数: name(string,必填,新物体名称), " +
+            "target(string,可选,父物体层级路径/名称,空=场景根), " +
+            "position(float[]3,可选,世界), rotation(float[]3欧拉或4四元数,可选,quaternion=true时按四元数), scale(float[]3,可选)")]
+        public static object Create(BridgeContext ctx, BridgeArgs args)
+        {
+            if (string.IsNullOrWhiteSpace(args.name))
+                throw new ArgumentException("gameobject.create 需要参数 name（新物体名称）");
+
+            var go = new GameObject(args.name);
+            Undo.RegisterCreatedObjectUndo(go, "UnityBridge gameobject.create");
+
+            if (!string.IsNullOrWhiteSpace(args.target))
+            {
+                var parent = ResolveTarget(args.target);
+                go.transform.SetParent(parent.transform, false);
+            }
+            ApplySpawnTransform(go.transform, args);
+
+            return BuildState(BuildPath(go.transform), go, args.quaternion);
+        }
+
         // ---------- gameobject.instantiate / gameobject.destroy ----------
 
         [BridgeCommand("gameobject.instantiate",
@@ -229,8 +253,9 @@ namespace UnityPythonBridge.Commands
             };
         }
 
-        /// <summary>解析目标：路径优先，名称兼容（重名报错）。</summary>
-        private static GameObject ResolveTarget(string target)
+        /// <summary>解析目标：路径优先，名称兼容（重名报错）。
+        /// internal：同程序集的 BuildCommands（component.add / property.set）也复用这套查找规则。</summary>
+        internal static GameObject ResolveTarget(string target)
         {
             if (string.IsNullOrWhiteSpace(target))
                 throw new ArgumentException("gameobject 命令需要参数 target（名称或层级路径，如 \"Player/Body\"）");
@@ -305,8 +330,9 @@ namespace UnityPythonBridge.Commands
                 CollectByName(t.GetChild(i), name, matches);
         }
 
-        /// <summary>构建从场景根到目标的唯一路径 "Root/Child/..."。</summary>
-        private static string BuildPath(Transform t)
+        /// <summary>构建从场景根到目标的唯一路径 "Root/Child/..."。
+        /// internal：同程序集的 BuildCommands 复用。</summary>
+        internal static string BuildPath(Transform t)
         {
             var names = new List<string>();
             var cur = t;

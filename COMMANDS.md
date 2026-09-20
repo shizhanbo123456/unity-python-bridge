@@ -46,15 +46,20 @@ python -m unity_bridge terrain-list --json
 | `debug.get_logs` | `debug-logs`（`dlogs`） | **读回**最近 N 条 Console 日志（环形缓冲 500，自订阅时刻起）；`--count`（默认 50）、`--type`（all/log/warning/error/exception）；返回 `{index, time, type, message, stackTrace}` |
 | `debug.log_version` | `debug-log-version`（`dlogv`） | Console 打印桥接层版本号（含命令总数） |
 
-## 三、相机与截图（3 条）
+## 三、相机与截图（4 条）
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `prefab.screenshot` | `screenshot`（`shot`） | **隔离渲染**预制体/模型为 PNG（复制到 `(9999,9999,9999)`，摄后销毁）。相机定位二选一：`--offset "x,y,z"`（相对预制体，必填）或 `--camPos`/`--lookAt`（直接指定，`--relative` 切相对模式，`--lookAt` 缺省=预制体）。其它：`--orthographic`、`--fov`（透视=fov/正交=size）、`--width`（1920）、`--height`（1080）、`--bg "r,g,b[,a]"`（默认透明）、`--light`（补光强度，推荐 2） |
 | `prefab.billboard` | `prefab-billboard`（`billboard`、`pboard`） | 按 `--camera-position "x,y,z"` 指定的相机相对单位方向正交截取透明 PNG；`output` 必须是输出目录，相对路径基于 `Assets`；先计算投影 bounds，再按 `--pixels-per-meter`（默认 100）自动确定宽高；`--light` 控制与相机同向的平行光强度（默认 2，负数关闭）；输出文件名为预制体名 |
 | `view.camera` | `view-screenshot`（`vshot`） | 渲染**场景中指定相机的实时画面**为 PNG（不隔离、不创建临时物体）。`output`(.png)、`--camera`（省略时依次找 MainCamera → "Main Camera" → 第一个激活相机）、`--width`/`--height`（默认相机当前分辨率） |
+| `view.window` | `view-window`（`vwin`） | 抓 **Game 视图的最终呈现**（含 uGUI / UI Toolkit 的 **Overlay UI**）为 PNG。`output`(.png)、`--super-size`（分辨率倍数 1~4，默认 1；输出分辨率 = Game 视图分辨率 × 该值）、`--wait`（等待落盘秒数，默认 5） |
 
-> `prefab.screenshot` = 单资产隔离渲染（不依赖场景相机）；`view.camera` = 场景已有相机的实时画面。抓"Scene/Game 窗口最终呈现"（含 UI 叠加）为规划中的 `view.window`，尚未实现。
+> `prefab.screenshot` = 单资产隔离渲染（不依赖场景相机）；`view.camera` = 场景已有相机的实时画面；`view.window` = Game 视图合成后的最终画面。
+> ⚠️ `view.camera` / `view.camera_create` 走的是相机渲染，**相机看不见 Screen Space Overlay 的 uGUI Canvas 和 UI Toolkit 面板**——要截 UI 请用 `view.window`。
+> ⚠️ `view.window` 底层是 `ScreenCapture`，文件在**帧末异步落盘**，命令返回时文件可能还没生成（CLI 的 `view-window` 子命令已内置轮询等待）。
+> ⚠️ **Edit Mode 下必须让 Game 视图成为「当前选中的标签页」**，否则 Unity 会静默接受请求却不写文件（Scene 视图被选中时）；此时切到 Game 视图会补写最近一次捕获的图。**Scene 视图本身不支持截取**（公开 API 无法抓取）。
+
 
 ## 四、场景与 Prefab 层级（3 条）
 
@@ -147,6 +152,34 @@ python -m unity_bridge terrain-list --json
 
 ---
 
+## 十、构建类命令（4 条）
+
+> 补上"桥只能实例化已有 Prefab、只能改 Transform 的 position/rotation/scale"的短板——
+> 有了这 4 条，物体 / 组件 / 资产都能从命令行从零搭出来（UI 载体、uGUI 层级都适用）。
+> `property.set` 的 `target`：以 `Assets/` 或 `Packages/` 开头按**资产**解析，否则按**场景物体层级路径**解析。
+
+| 服务端命令 | CLI（别名） | 关键参数 / 说明 |
+|---|---|---|
+| `gameobject.create` | `gameobject-create`（`gcreate`） | 场景中新建**空物体**（支持 Undo）。`name`(必填)、`--target`(父物体层级路径，空=场景根)、`--position`(世界)、`--rotation`(欧拉，`--quaternion` 时四元数)、`--scale` |
+| `component.add` | `component-add`（`cadd`） | 给场景物体**加组件**（支持 Undo；**已存在则跳过不报错**，返回 `added=false`）。`target`、`--component`（类型名，简名 `UIDocument` 或全名 `UnityEngine.UIElements.UIDocument` 均可） |
+| `property.set` | `property-set`（`pset`） | 按名**写入属性/字段**（支持 Undo；**资产目标会 SaveAssets 落盘**）。`target`、`--component`(可选，省略=对 target 本身操作)、`--property`(属性名 / 字段名 / `m_Xxx` 序列化字段)、`--value`。值按成员真实类型自动转换：bool 收 `true/false/1/0`；枚举收名字；`Vector`/`Color` 收 `"x,y,z"`；**引用类型收 Assets 路径**；字面量 `null` 置空。返回 `memberKind`(property/field/serialized) 与实际写入值 |
+| `asset.create` | `asset-create`（`acreate`） | 反射创建 **ScriptableObject 资产**（如 `PanelSettings`）。`type`(简名或全名)、`--path`(必须 `Assets/` 开头)、`--overwrite`(默认拒绝覆盖并报错) |
+
+### 用这 4 条搭一套 UI Toolkit 载体（完整示例）
+```bash
+python -m unity_bridge acreate PanelSettings --path "Assets/UI/UITestPanelSettings.asset"
+python -m unity_bridge pset "Assets/UI/UITestPanelSettings.asset" --property themeStyleSheet --value "Assets/UI Toolkit/UnityDefaultRuntimeTheme.tss"
+python -m unity_bridge gcreate UITest
+python -m unity_bridge cadd UITest --component UIDocument
+python -m unity_bridge pset UITest --component UIDocument --property panelSettings   --value "Assets/UI/UITestPanelSettings.asset"
+python -m unity_bridge pset UITest --component UIDocument --property visualTreeAsset --value "Assets/UI/UITestPanel.uxml"
+python -m unity_bridge view-window out/ui.png
+```
+
+> uGUI 的 `Canvas` / `CanvasScaler` / `Image` / `EventSystem` 同样用这 4 条即可搭起来，不需要手工摆放。
+
+---
+
 ## 常用工作流
 
 ### 造地形（一条龙）
@@ -160,8 +193,11 @@ python -m unity_bridge terrain-add-trees --prototypeIndex 0 --random --count 50 
 ```bash
 # 隔离渲染单资产（相机位置/观察点直接指定）
 python -m unity_bridge screenshot Assets/Prefabs/Tree.prefab out/tree.png --offset "0,0,0" --camPos "5,3,8" --lookAt "0,0,0" --light 2
-# 抓场景相机实时画面
+# 抓场景相机实时画面（相机看不见的 Overlay UI 不会出现在这张图里）
 python -m unity_bridge view-screenshot out/game.png
+# 抓 Game 视图最终呈现——评审 uGUI / UI Toolkit 界面用这个（含 Overlay UI）
+python -m unity_bridge view-window out/ui.png
+python -m unity_bridge view-window out/ui_2x.png --super-size 2   # 两倍分辨率，便于看细节
 ```
 
 ### stash 快照调试（stash → clear → 截图 → apply）

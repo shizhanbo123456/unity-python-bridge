@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from typing import List, Optional
@@ -457,6 +458,62 @@ def _cmd_view_camera_create(args) -> int:
     return 0
 
 
+def _png_size(path: str):
+    """从 PNG 文件头读宽高（纯标准库，不依赖 Pillow）。返回 (width, height) 或 None。"""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(24)
+    except OSError:
+        return None
+    if len(head) < 24 or head[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+
+
+def _cmd_view_window(args) -> int:
+    if not args.output.lower().endswith(".png"):
+        print(f"[错误] output 必须是 .png 文件路径（当前: {args.output}）", file=sys.stderr)
+        return 1
+
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.view_window(output=args.output, super_size=args.super_size)
+
+    out = data.get("output") or args.output
+
+    # Unity 侧 ScreenCapture 在帧末异步写文件，这里轮询等它落盘
+    deadline = time.time() + args.wait
+    while time.time() < deadline:
+        try:
+            if os.path.getsize(out) > 0:
+                break
+        except OSError:
+            pass
+        time.sleep(0.05)
+    else:
+        print(f"[错误] 等待截图落盘超时（{args.wait}s）: {out}", file=sys.stderr)
+        print("提示：Edit Mode 下 Unity 要求 **Game 视图为当前选中的标签页**，截图才会写入"
+              "（Scene 视图被选中时不会写文件）；切到 Game 视图后重试，或先执行 play 进入 Play Mode。",
+              file=sys.stderr)
+        return 1
+
+    size = _png_size(out)
+    nbytes = os.path.getsize(out)
+
+    if args.json:
+        result = dict(data)
+        result["bytes"] = nbytes
+        if size:
+            result["width"], result["height"] = size
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+
+    print(f"output    : {out}")
+    print(f"size      : {size[0]}x{size[1]}" if size else "size      : 无法解析 PNG 尺寸")
+    print(f"bytes     : {nbytes}")
+    print(f"superSize : {data.get('superSize')}")
+    return 0
+
+
 def _cmd_gameobject_get(args) -> int:
     with UnityClient(args.host, args.port, args.timeout) as client:
         data = client.gameobject_get(args.target, quaternion=args.quaternion)
@@ -528,6 +585,66 @@ def _print_go_state(data: dict) -> None:
 
 
 # ============ Terrain 程序化编辑命令 ============
+
+
+def _cmd_gameobject_create(args) -> int:
+    try:
+        position = _parse_vec3(args.position) if args.position else None
+        rotation = _parse_vec3(args.rotation) if args.rotation else None
+        scale = _parse_vec3(args.scale) if args.scale else None
+    except ValueError as e:
+        print(f"[错误] position/rotation/scale 解析失败: {e}", file=sys.stderr)
+        return 1
+
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.gameobject_create(args.name, target=args.target,
+                                        position=position, rotation=rotation,
+                                        scale=scale, quaternion=args.quaternion)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_go_state(data)
+    return 0
+
+
+def _cmd_component_add(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.component_add(args.target, args.component)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"target   : {data.get('target')}")
+    print(f"component: {data.get('component')}")
+    print(f"added    : {'是' if data.get('added') else '否（该物体上已存在）'}")
+    if data.get("message"):
+        print(f"message  : {data.get('message')}")
+    return 0
+
+
+def _cmd_property_set(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.property_set(args.target, args.property, args.value,
+                                   component=args.component)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"owner  : {data.get('owner')}")
+    print(f"member : {data.get('property')}  ({data.get('memberKind')} / {data.get('memberType')})")
+    print(f"value  : {data.get('value')}")
+    print(f"saved  : {'已落盘' if data.get('saved') else '未落盘（场景目标，交给 Unity dirty 机制）'}")
+    return 0
+
+
+def _cmd_asset_create(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.asset_create(args.type, args.path, overwrite=args.overwrite)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    print(f"path   : {data.get('path')}")
+    print(f"type   : {data.get('type')}")
+    print(f"created: {'是' if data.get('created') else '否'}")
+    return 0
 
 
 def _parse_floats(s):
@@ -1035,6 +1152,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_vcc.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_vcc.set_defaults(func=_cmd_view_camera_create)
 
+    p_vwin = sub.add_parser(
+        "view-window", aliases=["vwin"],
+        help="抓 Game 视图最终呈现（含 Overlay UI）保存为 PNG；截 uGUI / UI Toolkit 界面用这个")
+    p_vwin.add_argument("output", help="PNG 输出路径（必须以 .png 结尾）")
+    p_vwin.add_argument("--super-size", type=int, default=1,
+                        help="分辨率倍数 1~4（默认 1；输出分辨率 = Game 视图分辨率 × 该值）")
+    p_vwin.add_argument("--wait", type=float, default=5.0,
+                        help="等待截图落盘的秒数（默认 5；ScreenCapture 在帧末异步写入）")
+    p_vwin.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_vwin.set_defaults(func=_cmd_view_window)
+
     p_gget = sub.add_parser(
         "gameobject-get", aliases=["gget"],
         help="读取 GameObject 的 active 状态与 Transform 的 position/rotation/scale")
@@ -1063,6 +1191,53 @@ def build_parser() -> argparse.ArgumentParser:
     p_gset.add_argument("--quaternion", action="store_true", help="rotation/rotate 按四元数输入/输出")
     p_gset.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_gset.set_defaults(func=_cmd_gameobject_set)
+
+    p_gcreate = sub.add_parser(
+        "gameobject-create", aliases=["gcreate"],
+        help="在场景中新建空物体（支持 Undo）")
+    p_gcreate.add_argument("name", help="新物体名称")
+    p_gcreate.add_argument("--target", default=None, help="父物体层级路径/名称（省略=场景根）")
+    p_gcreate.add_argument("--position", default=None, help="世界坐标 'x,y,z'")
+    p_gcreate.add_argument("--rotation", default=None,
+                           help="旋转 'x,y,z' 欧拉角（--quaternion 时 'x,y,z,w'）")
+    p_gcreate.add_argument("--scale", default=None, help="localScale 'x,y,z'")
+    p_gcreate.add_argument("--quaternion", action="store_true", help="rotation 以四元数解释")
+    p_gcreate.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_gcreate.set_defaults(func=_cmd_gameobject_create)
+
+    p_cadd = sub.add_parser(
+        "component-add", aliases=["cadd"],
+        help="给场景物体添加组件（已存在则跳过不报错）")
+    p_cadd.add_argument("target", help="物体层级路径/名称")
+    p_cadd.add_argument("--component", required=True,
+                        help="组件类型名（简名 UIDocument 或全名 UnityEngine.UIElements.UIDocument）")
+    p_cadd.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_cadd.set_defaults(func=_cmd_component_add)
+
+    p_pset = sub.add_parser(
+        "property-set", aliases=["pset"],
+        help="按名写入属性/字段；target 支持场景物体路径或 Assets 资产路径")
+    p_pset.add_argument("target", help="场景物体层级路径，或 Assets/ 开头的资产路径")
+    p_pset.add_argument("--component", default=None,
+                        help="组件类型名（省略=对 target 本身操作；target 是资产时不可指定）")
+    p_pset.add_argument("--property", required=True,
+                        help="属性名或字段名（兼容 m_Xxx 形式的序列化字段）")
+    p_pset.add_argument("--value", required=True,
+                        help="值：bool 收 true/false/1/0；枚举收名字；Vector/Color 收 'x,y,z'；"
+                             "引用类型收 Assets 路径；字面量 null 置空")
+    p_pset.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_pset.set_defaults(func=_cmd_property_set)
+
+    p_acreate = sub.add_parser(
+        "asset-create", aliases=["acreate"],
+        help="反射创建 ScriptableObject 资产（如 PanelSettings）")
+    p_acreate.add_argument("type", help="类型名（简名或全名，如 PanelSettings）")
+    p_acreate.add_argument("--path", required=True,
+                           help="Assets 下的输出路径（如 Assets/UI/UITestPanelSettings.asset）")
+    p_acreate.add_argument("--overwrite", action="store_true",
+                           help="已存在时覆盖（默认拒绝覆盖并报错）")
+    p_acreate.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_acreate.set_defaults(func=_cmd_asset_create)
 
     # ============ Terrain 程序化编辑 ============
 

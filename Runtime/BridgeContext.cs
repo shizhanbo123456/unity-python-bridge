@@ -83,8 +83,10 @@ namespace UnityPythonBridge
         public float[] positions;   // 树木位置列表，每 3 个一组 {x, y, z}（归一化 0~1）
         public bool random;
 
-        // ---- terrain stash（stash / apply_stash / stash_delete / stash_list）----
-        /// <summary>stash 类型："trees" / "details" / "all"（省略时默认 "all"）。</summary>
+        // ---- terrain stash（stash / apply_stash / stash_delete / stash_list）/ asset.create ----
+        // 注意：type 被多命令复用——terrain.stash 解释为 "trees"/"details"/"all"；
+        // asset.create 解释为要创建的 ScriptableObject 类型名（如 PanelSettings），勿重复声明
+        /// <summary>stash 类型："trees" / "details" / "all"（省略时默认 "all"）；asset.create 时为要创建的类型名。</summary>
         public string type;
         /// <summary>stash 名称（不含扩展名，如 "forest_v1"）。同名保存会报错，不允许覆盖。</summary>
         public string name;
@@ -92,6 +94,20 @@ namespace UnityPythonBridge
         // ---- view.camera（抓取指定相机）----
         /// <summary>相机 GameObject 名称；省略时依次找 MainCamera / 名为 Main Camera 的 / 第一个相机。</summary>
         public string camera;
+
+        // ---- view.window（抓 Game 视图最终呈现）----
+        /// <summary>分辨率倍数（1~4，默认 1；输出分辨率 = Game 视图分辨率 × 该值）。</summary>
+        public int superSize;
+
+        // ---- component.add / property.set / asset.create ----
+        /// <summary>组件类型名（简名如 UIDocument，或全名如 UnityEngine.UIElements.UIDocument）。</summary>
+        public string component;
+        /// <summary>property.set：要写入的属性名或字段名（也兼容 m_Xxx 形式的序列化字段）。</summary>
+        public string property;
+        /// <summary>property.set：字符串形式的值，按目标成员类型自动转换；引用类型按资产路径加载。</summary>
+        public string value;
+        /// <summary>asset.create：目标资产已存在时是否覆盖（默认 false，存在即报错）。</summary>
+        public bool overwrite;
 
         // ---- gameobject.get / gameobject.set ----
         /// <summary>目标物体：层级路径（如 "Player/Body"）优先，单个名称兼容（重名时报错）。</summary>
