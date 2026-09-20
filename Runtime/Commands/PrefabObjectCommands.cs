@@ -27,11 +27,27 @@ namespace UnityPythonBridge.Commands
         public bool saved;
     }
 
+    /// <summary>prefab.create 返回结构。</summary>
+    [System.Serializable]
+    public class PrefabCreateResult
+    {
+        public string prefab;     // 生成的 Prefab 资产路径
+        public string source;     // 源场景物体的层级路径
+        public bool connected;    // 场景物体是否已成为该 Prefab 的实例
+        public bool variant;      // 源物体本身是 Prefab 实例根 → 生成的是 Variant
+        public bool overwrote;    // 是否覆盖了已存在的资产
+    }
+
     /// <summary>
-    /// Prefab 资产内部的对象级编辑：新建空物体 / 创建原生几何体 / 加组件 / 写属性。
+    /// Prefab 资产的对象级编辑：
+    ///   - prefab.create          场景物体 → Prefab 资产（本类型的唯一「外向」命令）
+    ///   - prefab.create_object   在 Prefab 内部新建空物体
+    ///   - prefab.create_primitive 在 Prefab 内部创建原生几何体
+    ///   - prefab.add_component   给 Prefab 内部物体加组件
+    ///   - prefab.set             写 Prefab 内部物体的属性/字段
     ///
-    /// 与 prefab.edit 同源：都是 LoadPrefabContents → 改 → SaveAsPrefabAsset → UnloadPrefabContents，
-    /// **直接改并保存资产**，不经场景，不能用场景 Ctrl+Z 回退。
+    /// 后 4 条与 prefab.edit 同源：都是 LoadPrefabContents → 改 → SaveAsPrefabAsset →
+    /// UnloadPrefabContents，**直接改并保存资产**，不经场景，不能用场景 Ctrl+Z 回退。
     /// target 统一为「Prefab 内部相对路径」，空 = 根节点。
     ///
     /// ⚠️ 已知副作用：新建物体时 Unity 没有"直接往指定场景里造物体"的公开 API，
@@ -40,6 +56,67 @@ namespace UnityPythonBridge.Commands
     /// </summary>
     public static class PrefabObjectCommands
     {
+        // ---------- prefab.create ----------
+
+        [BridgeCommand("prefab.create",
+            "把场景中的物体另存为 Prefab 资产（父目录自动创建）。参数: " +
+            "target(string,必填,场景物体层级路径/名称), path(string,必填,须在 Assets 下且以 .prefab 结尾), " +
+            "detach(bool,可选,默认 false; true=只生成资产、场景物体保持为普通物体), " +
+            "overwrite(bool,可选,默认 false; 资产已存在则报错)。" +
+            "注意: target 可以是普通物体或 Prefab 实例的最外层根（后者生成 Variant），" +
+            "不能是 Prefab 实例内部的子物体；子物体若本身是 Prefab 实例会自动变成嵌套预制体")]
+        public static object CreateFromScene(BridgeContext ctx, BridgeArgs args)
+        {
+            var go = GameObjectCommands.ResolveTarget(args.target);
+            var sourcePath = GameObjectCommands.BuildPath(go.transform);
+
+            // 官方限制：输入必须是普通物体或 Prefab 实例的最外层根，不能是实例内部的子物体
+            if (PrefabUtility.IsPartOfPrefabInstance(go) && !PrefabUtility.IsOutermostPrefabInstanceRoot(go))
+                throw new InvalidOperationException(
+                    "目标是 Prefab 实例内部的子物体（" + sourcePath + "），无法另存为 Prefab；" +
+                    "请改用该实例的最外层根物体作为 target。");
+
+            var prefabPath = (args.path ?? "").Trim().Replace('\\', '/');
+            if (string.IsNullOrWhiteSpace(prefabPath))
+                throw new ArgumentException("prefab.create 需要参数 path（如 Assets/Prefabs/Card.prefab）");
+            if (!prefabPath.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("path 必须以 Assets/ 开头（当前: " + prefabPath + "）");
+            if (!prefabPath.EndsWith(".prefab", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("path 必须以 .prefab 结尾（当前: " + prefabPath + "）");
+
+            var existing = AssetDatabase.LoadMainAssetAtPath(prefabPath);
+            if (existing != null && !args.overwrite)
+                throw new ArgumentException("Prefab 已存在，拒绝覆盖（如需覆盖请传 overwrite=true）: " + prefabPath);
+
+            var isInstanceRoot = PrefabUtility.IsOutermostPrefabInstanceRoot(go);
+            if (isInstanceRoot &&
+                AssetDatabase.GetAssetPath(PrefabUtility.GetCorrespondingObjectFromSource(go)) == prefabPath)
+                throw new InvalidOperationException(
+                    "源物体已经是该 Prefab 的实例，无需另存；改内容请用 prefab.set / prefab.add_component。");
+
+            EnsureFolderFor(prefabPath);
+
+            // detach=false → AndConnect：场景物体变成该 Prefab 的实例（同 Unity 里拖到 Project 窗口）
+            // detach=true  → SaveAsPrefabAsset：只写资产，场景物体保持为普通物体，两者互不相连
+            if (args.detach)
+                PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+            else
+                PrefabUtility.SaveAsPrefabAssetAndConnect(go, prefabPath, InteractionMode.AutomatedAction);
+
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) == null)
+                throw new InvalidOperationException("保存失败，未生成 Prefab 资产（详见 Unity 控制台）: " + prefabPath);
+            AssetDatabase.SaveAssets();
+
+            return new PrefabCreateResult
+            {
+                prefab = prefabPath,
+                source = sourcePath,
+                connected = !args.detach && PrefabUtility.IsPartOfPrefabInstance(go),
+                variant = isInstanceRoot,
+                overwrote = existing != null,
+            };
+        }
+
         // ---------- prefab.create_object ----------
 
         [BridgeCommand("prefab.create_object",
@@ -169,6 +246,22 @@ namespace UnityPythonBridge.Commands
         }
 
         // ---------- 内部工具 ----------
+
+        /// <summary>确保资产所在目录存在（逐级创建，如 Assets/Prefabs/Sub）。</summary>
+        private static void EnsureFolderFor(string assetPath)
+        {
+            var dir = assetPath.Substring(0, assetPath.LastIndexOf('/'));
+            if (AssetDatabase.IsValidFolder(dir)) return;
+
+            var parts = dir.Split('/');
+            var parent = parts[0];                       // 必然是 "Assets"
+            for (int i = 1; i < parts.Length; i++)
+            {
+                var next = parent + "/" + parts[i];
+                if (!AssetDatabase.IsValidFolder(next)) AssetDatabase.CreateFolder(parent, parts[i]);
+                parent = next;
+            }
+        }
 
         /// <summary>在 Prefab 内容作用域内执行 body，正常结束后统一写回资产（抛异常则不保存）。</summary>
         private static T InPrefab<T>(string prefabPathArg, Func<GameObject, T> body)

@@ -601,6 +601,23 @@ class UnityClient:
             args["target"] = target
         return self.call("prefab.set", **args)
 
+    def prefab_create(self, target: str, path: str, detach: bool = False,
+                      overwrite: bool = False) -> dict:
+        """把场景中的物体另存为 Prefab 资产（父目录会自动创建）。
+
+        target: 场景物体层级路径或唯一名称；可以是普通物体或 Prefab 实例的最外层根
+                （后者生成 Variant），不能是 Prefab 实例内部的子物体。
+        path:   须在 Assets 下且以 .prefab 结尾。
+        detach: True=只生成资产，场景物体保持为普通物体；False（默认）=场景物体变为
+                该 Prefab 的实例（同 Unity 里把物体拖进 Project 窗口的行为）。
+        """
+        args = {"target": target, "path": path}
+        if detach:
+            args["detach"] = True
+        if overwrite:
+            args["overwrite"] = True
+        return self.call("prefab.create", **args)
+
     # ---- 内部 ----
 
     def _ensure_connected(self) -> None:

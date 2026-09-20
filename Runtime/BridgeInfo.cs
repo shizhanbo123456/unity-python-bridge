@@ -42,8 +42,11 @@ namespace UnityPythonBridge
         ///   v1.17.0 新增 Prefab 资产内部的对象级编辑：prefab.create_object（建空物体，作组件载体）、
         ///          prefab.create_primitive（建原生几何体）、prefab.add_component（加组件）、
         ///          prefab.set（写属性/字段）；并新增 gameobject.create_primitive（场景内建原生几何体）
+        ///   v1.18.0 新增 prefab.create（场景物体另存为 Prefab 资产，父目录自动创建；detach=false
+        ///          时场景物体变为该 Prefab 的实例，同 Unity 拖拽行为）——补齐「场景搭好 → 存成
+        ///          预制体 → 复用」的最后一环
         /// </summary>
-        public const string Version = "1.17.0";
+        public const string Version = "1.18.0";
 
         /// <summary>在 Unity Console 打印版本与命令统计。</summary>
         public static void PrintVersion()

@@ -117,6 +117,10 @@ namespace UnityPythonBridge
         /// <summary>材质资产路径（Assets 下），赋给新建几何体的 Renderer.sharedMaterial；省略则用 Unity 默认材质。</summary>
         public string material;
 
+        // ---- prefab.create ----
+        /// <summary>true=只生成资产，场景物体保留为普通物体；默认 false=场景物体变为该 Prefab 的实例（同 Unity 拖拽行为）。</summary>
+        public bool detach;
+
         // ---- gameobject.get / gameobject.set ----
         /// <summary>目标物体：层级路径（如 "Player/Body"）优先，单个名称兼容（重名时报错）。</summary>
         public string target;

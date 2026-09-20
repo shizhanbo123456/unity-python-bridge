@@ -88,15 +88,17 @@ python -m unity_bridge terrain-list --json
 | `gameobject.instantiate` | 无专用子命令（`client.call("gameobject.instantiate")` / 原始 TCP） | 在场景中实例化 Prefab（支持 Undo）；`path`(必填,Prefab 资产路径)、`target`(可选,父物体层级路径/名称,空=场景根)、`name`(可选)、`position`/`rotation`/`scale`/`quaternion`(可选) |
 | `gameobject.destroy` | 无专用子命令（`client.call("gameobject.destroy")` / 原始 TCP） | 销毁场景中的 GameObject（支持 Undo）；`target`(必填,层级路径/名称) |
 
-## 七、Prefab 资产内部编辑（7 条）
+## 七、Prefab 资产编辑（8 条）
 
-> 这 7 条命令**直接改并保存 Prefab 资产**（不经场景，**不能用场景 Ctrl+Z 回退**）。
+> 其中 7 条**直接改并保存 Prefab 资产**（不经场景，**不能用场景 Ctrl+Z 回退**），
+> `target` 统一为「Prefab **内部**相对路径」，空 = 根节点。
+> `prefab.create` 是反方向——把**场景物体**存成 Prefab 资产，它的 `target` 指场景物体。
 > `prefab.edit` / `remove` / `instantiate` 位于 `Runtime/Commands/PrefabEditCommands.cs`；
-> `prefab.create_object` / `create_primitive` / `add_component` / `set` 位于 `Runtime/Commands/PrefabObjectCommands.cs`。
-> 全部命令的 `target` 统一为「Prefab **内部**相对路径」，空 = 根节点。
+> `prefab.create` / `create_object` / `create_primitive` / `add_component` / `set` 位于 `Runtime/Commands/PrefabObjectCommands.cs`。
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
+| `prefab.create` | `prefab-create`（`pcreate`） | 把**场景物体另存为 Prefab 资产**（父目录自动创建）。`target`(场景物体层级路径/名称)、`--path`(必填，Assets 下、须以 `.prefab` 结尾)、`--detach`(只生成资产、场景物体保持为普通物体)、`--overwrite`(默认拒绝覆盖，已存在则报错)。**默认**场景物体变为该 Prefab 的实例，与 Unity 里把物体拖进 Project 窗口的行为一致 |
 | `prefab.edit` | 无专用子命令（`client.call("prefab.edit")` / 原始 TCP） | 编辑 Prefab 资产内部物体的 Transform（直接保存资产）；`path`(必填,Prefab 资产路径)、`target`(可选,内部层级路径,空=根)、`position`/`rotation`/`scale`/`move`/`rotate`/`zoom`/`quaternion`（语义同 `gameobject.set`） |
 | `prefab.remove` | 无专用子命令（`client.call("prefab.remove")` / 原始 TCP） | 从 Prefab 资产内部删除物体（直接保存资产）；`path`(必填)、`target`(必填,内部层级路径) |
 | `prefab.instantiate` | 无专用子命令（`client.call("prefab.instantiate")` / 原始 TCP） | 在 Prefab 资产内部实例化另一个 Prefab 为子物体（直接保存资产）；`path`(必填,目标 Prefab)、`output`(必填,子 Prefab 资产路径)、`target`(可选,内部父路径)、`position`/`rotation`/`scale`(可选) |
@@ -108,6 +110,14 @@ python -m unity_bridge terrain-list --json
 > ⚠️ **已知副作用**：`prefab.create_object` / `prefab.create_primitive` 可能把你**当前打开的场景标为"已修改"**（内容其实没变）。
 > 原因：Unity 没有「直接往指定场景里造物体」的公开 API，只能先 `new` 出来（落点必然是活动场景）再搬进 Prefab 的预览场景。
 > 按 Ctrl+S 存一下、或直接忽略即可，不影响实际内容。
+
+> ⚠️ `prefab.create` 的两条限制来自 Unity 官方 API（`PrefabUtility.SaveAsPrefabAsset*`）：
+> ① `target` **不能是 Prefab 实例内部的子物体**，只能是普通物体或实例的最外层根；
+> 若传的是实例的最外层根，生成的是 **Variant**（返回里 `variant=true`），要独立预制体得先在 Unity 里 Unpack。
+> ② `target` 的子物体若本身是 Prefab 实例，会自动变成**嵌套预制体**。
+
+> 注：`SaveAsPrefabAsset` 与 `SaveAsPrefabAssetAndConnect` 覆盖已有 Prefab 时是**原地覆盖**（保留 GUID 与外部引用），
+> 且 Unity 靠**名称匹配**尽量保留对子物体/组件的引用——所以覆盖前请确保 Prefab 内物体名称唯一。
 
 
 ## 八、地形编辑（19 条）
@@ -169,7 +179,7 @@ python -m unity_bridge terrain-list --json
 
 > 补上"桥只能实例化已有 Prefab、只能改 Transform 的 position/rotation/scale"的短板——
 > 有了这几条，物体 / 组件 / 资产都能从命令行从零搭出来（UI 载体、uGUI 层级、场景几何体都适用）。
-> 预制体资产**内部**的对象级编辑见[第七章](#七prefab-资产内部编辑7-条)。
+> 预制体资产**内部**的对象级编辑见[第七章](#七prefab-资产编辑8-条)；把场景物体存成 Prefab 见 `prefab.create`。
 > `property.set` 的 `target`：以 `Assets/` 或 `Packages/` 开头按**资产**解析，否则按**场景物体层级路径**解析。
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
@@ -208,6 +218,28 @@ python -m unity_bridge terrain-set-heights --noise --noiseScale 0.02 --noiseSeed
 python -m unity_bridge terrain-set-details --layer 0 --random --count 200 --seed 7 --density 4
 python -m unity_bridge terrain-add-trees --prototypeIndex 0 --random --count 50 --seed 7
 ```
+
+### 造物 → 存成 Prefab → 复用
+```bash
+# 1) 在场景里从零搭一棵结构（也可以用现成的场景物体）
+python -m unity_bridge gcreate Tree
+python -m unity_bridge gprim Cylinder --name Trunk --target Tree --position "0,0.5,0" --material "Assets/Art/Mat/Black.mat"
+python -m unity_bridge gprim Sphere   --name Crown --target Tree --position "0,1.6,0" --material "Assets/Art/Mat/Green.mat"
+
+# 2) 存成 Prefab（父目录 Assets/Prefabs 会自动创建）
+#    默认场景里的 Tree 同时变成该 Prefab 的实例（同 Unity 拖拽行为）；加 --detach 则只生成资产
+python -m unity_bridge pcreate Tree --path "Assets/Prefabs/Tree.prefab"
+
+# 3) 复用：实例化多个（gameobject.instantiate 无专用子命令，用 client 直调）
+python -c "from unity_bridge import UnityClient; UnityClient().call('gameobject.instantiate', path='Assets/Prefabs/Tree.prefab', position=[3,0,0])"
+
+# 4) 改资产内部 = 所有实例跟着变
+python -m unity_bridge pprim "Assets/Prefabs/Tree.prefab" Sphere --name Berry --position "0.3,1.8,0"
+python -m unity_bridge pfset "Assets/Prefabs/Tree.prefab" --target Crown --component SphereCollider --property radius --value 0.6
+python -m unity_bridge ptree "Assets/Prefabs/Tree.prefab"
+```
+> `pcreate` 的 `--overwrite` 是**原地覆盖**（保留 GUID 与外部引用），默认拒绝覆盖。
+> 若把 Prefab 实例存成 Prefab，生成的是 **Variant**（返回 `variant=true`）——Unity 官方行为，要独立预制体需先 Unpack。
 
 ### 截图评审（配合 AI 识图）
 ```bash

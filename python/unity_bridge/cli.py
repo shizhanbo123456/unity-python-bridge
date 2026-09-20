@@ -777,6 +777,27 @@ def _cmd_prefab_set(args) -> int:
     return 0
 
 
+def _print_prefab_create(data: dict) -> None:
+    print(f"prefab   : {data.get('prefab')}")
+    print(f"source   : {data.get('source')}")
+    print("connected: " + ("是（场景物体已成为该 Prefab 的实例）" if data.get("connected")
+                           else "否（场景物体保持为普通物体）"))
+    if data.get("variant"):
+        print("variant  : 是（源物体本身是 Prefab 实例根，生成的是 Variant）")
+    print("overwrote: " + ("是（覆盖了已有资产）" if data.get("overwrote") else "否（新建）"))
+
+
+def _cmd_prefab_create(args) -> int:
+    with UnityClient(args.host, args.port, args.timeout) as client:
+        data = client.prefab_create(args.target, args.path,
+                                    detach=args.detach, overwrite=args.overwrite)
+    if args.json:
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        return 0
+    _print_prefab_create(data)
+    return 0
+
+
 def _parse_floats(s):
     """把 '1,2,3' / '1 2 3' 解析为 float 列表。"""
     parts = s.replace(",", " ").split()
@@ -1389,6 +1410,19 @@ def build_parser() -> argparse.ArgumentParser:
     p_gprim.add_argument("--material", default=None, help="Assets 下的材质路径")
     p_gprim.add_argument("--json", action="store_true", help="输出原始 JSON")
     p_gprim.set_defaults(func=_cmd_gameobject_create_primitive)
+
+    p_pcreate = sub.add_parser(
+        "prefab-create", aliases=["pcreate"],
+        help="把场景中的物体另存为 Prefab 资产（父目录自动创建）")
+    p_pcreate.add_argument("target", help="场景物体层级路径或唯一名称（不能是 Prefab 实例内部的子物体）")
+    p_pcreate.add_argument("--path", required=True,
+                           help="Prefab 资产路径（Assets 下，须以 .prefab 结尾）")
+    p_pcreate.add_argument("--detach", action="store_true",
+                           help="只生成资产，场景物体保持为普通物体（默认：场景物体变为该 Prefab 的实例）")
+    p_pcreate.add_argument("--overwrite", action="store_true",
+                           help="资产已存在时覆盖（默认拒绝并报错）")
+    p_pcreate.add_argument("--json", action="store_true", help="输出原始 JSON")
+    p_pcreate.set_defaults(func=_cmd_prefab_create)
 
     p_pnew = sub.add_parser(
         "prefab-create-object", aliases=["pnew"],
