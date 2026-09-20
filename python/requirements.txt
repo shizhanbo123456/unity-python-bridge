@@ -1,2 +1,2 @@
-# 本项目 Python 侧仅使用标准库，无需安装任何依赖。
-# 便于在 requirements 文件缺失时说明。
+# The CLI stays stdlib-only; the optional MCP entry point uses the MCP SDK.
+mcp>=1.0,<2

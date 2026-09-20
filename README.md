@@ -102,6 +102,26 @@ python -m unity_bridge gameobject-set "Player/Body" --rotate "0,90,0"      # 欧
 python -m unity_bridge gameobject-set "Player/Body" --zoom "2,1,1"         # x 轴放大 2 倍
 ```
 
+### 2.1 MCP 适配器（可选）
+
+MCP 入口复用同一个 `UnityClient` 和 TCP/JSON 服务，Unity 侧无需额外组件。它通过 stdio 向 MCP 客户端提供 12 个入口工具：高频操作使用参数明确的强类型工具，`list_unity_commands` + `call_unity_command` 受控网关覆盖 Unity 当前注册的全部 Bridge 命令。
+
+```bash
+cd python
+python -m pip install -r requirements.txt
+python -m unity_bridge.mcp_server
+```
+
+客户端应以 `python -m unity_bridge.mcp_server` 启动服务，并把工作目录设为本仓库的 `python/`。可用下面的端到端测试验证 MCP 握手、工具发现和真实 Unity 调用：
+
+```bash
+python scripts/test_mcp_smoke.py
+```
+
+当前强类型工具包括连通/版本检查、场景树、GameObject 查询和 Transform 修改、Console 日志、Play Mode 进入/退出、相机截图以及编译恢复。其余命令先用 `list_unity_commands` 获取实时目录和参数说明，再由 `call_unity_command` 调用。只读命令可直接执行；Terrain 写入、Prefab 删除等会改变 Unity 状态的命令必须显式传入 `confirm_changes=true`。`bridge.reload` 只能通过专用 `reload_unity` 工具执行，以确保 Domain Reload 后等待服务器恢复。
+
+MCP stdio 进程通常由 Codex、Claude Desktop 等客户端按配置自动启动和关闭，不需要手动常驻运行。Unity Editor 及其 BridgeServer 仍须在线；本项目已启用的 Unity 自动启动/恢复机制可继续使用。
+
 ### 3. 无 Unity 环境联调（可选）
 
 ```bash
@@ -337,4 +357,4 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 - 若要在打包后的 Player 中使用，请自行评估：本项目针对 **Editor 开发期工具** 场景。
 - **首次导入后**：Unity 会为脚本生成 `.meta` 文件（GUID）。若希望跨项目复制时保持 GUID 稳定（推荐），请把生成的 `.meta` 一并提交到 git。
 - **自动化编译**：`bridge.reload` 是进程内 API，可稳定触发重编译（需 Unity 前台）；**模拟鼠标点击对 Unity 编辑器无效**（编辑器忽略注入输入），不要走那条路。
-- **版本演进**（当前 v1.17.0）：v1.0.0=独立重构（JsonUtility，5 条命令）→ v1.1.0=新增 12 条 terrain 命令 → v1.2.0=修复 list_commands 序列化 + 版本工具 → v1.3.0=新增 terrain.stash 四命令、view.camera、gameobject.get/set → v1.4.0=新增 debug.get_logs → v1.5.0=新增 debug.log_version → v1.6.0=版本号维护 → v1.7.0=服务器重复启动/停止打印 Warning → v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标 → v1.9.0=新增 scene.important_scripts → v1.10.0=scene.tree 遇到 prefab 实例根不展开 → v1.11.0=scene.tree 新增 depth/path → v1.12.0=新增 prefab.tree → v1.13.0=gameobject.set 新增相对操作 → v1.14.0=新增 prefab.bounds 与自动尺寸正交 prefab.billboard → v1.14.1=prefab.billboard 默认添加强度 2 的相机同向平行光并支持 light 参数 → v1.14.2=新增 editor.play/editor.stop/editor.pause/editor.unpause（Play Mode 控制，纯 Editor API，bridge 仓库通用能力）→ v1.15.0=新增 view.window（抓 Game 视图最终呈现，含 uGUI / UI Toolkit 的 Overlay UI）→ v1.16.0=新增构建类命令 4 条（gameobject.create / component.add / property.set / asset.create，让 UI 载体能全自动搭起来）→ v1.17.0=新增 Prefab 内部对象级编辑 4 条（prefab.create_object / create_primitive / add_component / set）与 gameobject.create_primitive（场景内建原生几何体）。可用 `python -m unity_bridge version` 或 `debug-log-version` 确认当前版本。
+- **版本演进**（当前 v1.17.0）：v1.0.0=独立重构（JsonUtility，5 条命令）→ v1.1.0=新增 12 条 terrain 命令 → v1.2.0=修复 list_commands 序列化 + 版本工具 → v1.3.0=新增 terrain.stash 四命令、view.camera、gameobject.get/set → v1.4.0=新增 debug.get_logs → v1.5.0=新增 debug.log_version → v1.6.0=版本号维护 → v1.7.0=服务器重复启动/停止打印 Warning → v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标 → v1.9.0=新增 scene.important_scripts → v1.10.0=scene.tree 遇到 prefab 实例根不展开 → v1.11.0=scene.tree 新增 depth/path → v1.12.0=新增 prefab.tree → v1.13.0=gameobject.set 新增相对操作 → v1.14.0=新增 prefab.bounds 与自动尺寸正交 prefab.billboard → v1.14.1=prefab.billboard 默认添加强度 2 的相机同向平行光并支持 light 参数 → v1.14.2=新增 editor.play/editor.stop/editor.pause/editor.unpause（Play Mode 控制，纯 Editor API，bridge 仓库通用能力）→ v1.15.0=新增 view.window（抓 Game 视图最终呈现，含 uGUI / UI Toolkit 的 Overlay UI）与 debug.set_log_filter（按子串过滤日志缓冲，传空清除过滤）→ v1.16.0=新增构建类命令 4 条（gameobject.create / component.add / property.set / asset.create，让 UI 载体能全自动搭起来）→ v1.17.0=新增 Prefab 内部对象级编辑 4 条（prefab.create_object / create_primitive / add_component / set）与 gameobject.create_primitive（场景内建原生几何体）。可用 `python -m unity_bridge version` 或 `debug-log-version` 确认当前版本。

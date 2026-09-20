@@ -93,7 +93,7 @@ prefab 资产内部物体名可能带首尾空格（如 `Tree_A_1.prefab` 里的
 ## E. 环境与维护
 
 **E1. Python 需要装包吗？**
-不需要。Python 侧纯标准库（3.8+），零 pip 依赖。
+原有 CLI 和 `UnityClient` 不需要，仍为纯标准库。使用可选 MCP 入口时需要在 `python/` 目录执行一次 `python -m pip install -r requirements.txt`。
 
 **E2. mock_unity_server.py 什么时候用？**
 没有 Unity 环境时验证命令行/客户端逻辑：终端 A `python scripts/mock_unity_server.py`，终端 B 正常用 CLI。
@@ -106,3 +106,9 @@ prefab 资产内部物体名可能带首尾空格（如 `Tree_A_1.prefab` 里的
 
 **E5. 能在打包后的 Player 里用吗？**
 不推荐。工具全部代码 `#if UNITY_EDITOR` 包裹，定位是 Editor 开发期工具。
+
+**E6. MCP Server 需要手动启动吗？**
+通常不需要。MCP 客户端会按配置自动启动和关闭 stdio Python 进程；Unity Editor 和 Unity BridgeServer 仍须在线。手动运行 `python -m unity_bridge.mcp_server` 主要用于排障，等待时没有普通终端输出属于正常现象。
+
+**E7. MCP 是否覆盖全部 Bridge 命令？**
+是。常用能力有参数明确的专用工具，其余能力通过 `list_unity_commands` 查询实时目录，再用 `call_unity_command` 调用。写操作必须显式确认；`bridge.reload` 必须使用能等待编译恢复的 `reload_unity`。

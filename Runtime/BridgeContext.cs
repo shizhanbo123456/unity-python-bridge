@@ -30,6 +30,10 @@ namespace UnityPythonBridge
         // 注意：count 复用下方 terrain 段的同名字段（均表示"数量"），勿重复声明
         public string message;
 
+        // ---- debug.set_log_filter ----
+        /// <summary>日志过滤子串：非空时只保留 message 包含该子串的日志；传空清除过滤。</summary>
+        public string substring;
+
         // ---- mesh.bounds / prefab.screenshot / scene.tree(起点) ----
         // 注意：path 被多命令复用——mesh.bounds/prefab.screenshot 解释为 Assets 资产路径，
         // scene.tree 解释为扫描起点（层级路径或唯一名称），各自命令自行解释，勿重复声明
