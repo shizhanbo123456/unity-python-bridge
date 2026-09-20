@@ -27,15 +27,25 @@
 **不能。** Unity 编辑器会忽略一切软件注入的鼠标输入（`SetForegroundWindow` 置前、`mouse_event` 点击、`PostMessage` 消息序列都无效，已实测）。`bridge.reload` 是进程内 API（`CompilationPipeline.RequestScriptCompilation`），不依赖输入事件，是自动化编译的正路。
 
 **B3. 怎么确认编译后代码生效？**
-`python -m unity_bridge reload --expect-version <版本号>`——版本不匹配会继续等待，匹配才返回成功；或编译完成后 `version` 查看命令数（如 v1.14.2 = 47 条）。
+`python -m unity_bridge reload --expect-version <版本号>`——版本不匹配会继续等待，匹配才返回成功；或编译完成后 `version` 查看命令数（如 v1.18.0 = 63 条）。
 
 **B4. reload 与「改 Assets 文件自动编译」的关系？**
 Unity 检测到 Assets 下 C# 变化会自动编译，但**失焦时会暂停**，需要窗口获得真实点击焦点才恢复。reload 则是在进程内显式请求编译，配合窗口置前即可全自动。
 
+**B5. 我在 Unity 外面新建了一个 `.cs` 文件，reload 一直不生效？**
+`bridge.reload` 只调用 `CompilationPipeline.RequestScriptCompilation()`，**不包含 `AssetDatabase.Refresh()`**，所以它只能重编译 Unity「已经导入过」的脚本。外部新建的文件还没进 AssetDatabase，reload 扫不到——表现为：`version` 不变、新文件没有 `.meta`、`Assembly-CSharp.dll` 时间戳不动、控制台也没有报错（**不是编译失败**）。
+
+处理：在 Unity 里按一次 **Ctrl+R**（或菜单 `Assets → Refresh`），或点一下 Unity 窗口让它获得焦点（Unity 会强制刷新资源库）。**修改已有文件没有这个问题**，reload 可直接生效。
+
 ## C. 命令使用
 
-**C1. `screenshot` 和 `view-screenshot` 有什么区别？**
-`screenshot`（`prefab.screenshot`）= 把单个预制体/模型临时复制到 `(9999,9999,9999)` 隔离渲染，适合"看单个资产"，用完销毁不污染场景；`view-screenshot`（`view.camera`）= 抓场景中**已有相机**的实时画面，适合"看整场景当前效果"。
+**C1. `screenshot`、`view-screenshot`、`vcc`、`view-window` 有什么区别？**
+- `screenshot`（`prefab.screenshot`）= 把单个预制体/模型临时复制到 `(9999,9999,9999)` **隔离渲染**，适合"看单个资产"，用完销毁不污染场景
+- `view-screenshot`（`view.camera`）= 抓场景中**已有相机**的实时画面，适合"看整场景当前效果"
+- `vcc`（`view.camera_create`）= 自己**临时 new 一台相机**放在任意位置/朝向拍真实场景，适合"从别的机位看"，截完销毁
+- `view-window`（`view.window`）= 抓 **Game 视图合成后的最终画面**，是**唯一能截到 uGUI / UI Toolkit Overlay UI 的**——评审界面用这个
+
+前三者走相机渲染，**相机看不见 Overlay UI**；要 UI 就必须用 `view-window`。
 
 **C2. 截图太暗或全黑？**
 场景里没有平行光。加 `--light 2`（推荐值）临时补一盏与相机同向的平行光，渲染完自动销毁。
@@ -56,7 +66,22 @@ Unity 检测到 Assets 下 C# 变化会自动编译，但**失焦时会暂停**�
 保存时的树原型数 / 草原型数 / detail 分辨率与当前地形不一致时会拒绝应用（防止错位），属保护行为。需先调整地形或删除旧 stash。
 
 **C8. 怎么读 Unity 的报错日志？**
-`python -m unity_bridge debug-logs --type error --count 20`（v1.4.0+），返回最近 20 条错误及完整 stackTrace。
+`python -m unity_bridge debug-logs --type error --count 20`（v1.4.0+），返回最近 20 条错误及完整 stackTrace。日志太多时用 `debug-set-log-filter <子串>` 只保留含该子串的日志（传空字符串清除过滤）。
+
+**C9. `view-window` 一直超时不落盘？**
+Edit Mode 下 `ScreenCapture` 有个硬约束（Unity 官方文档原文）：**Game 视图必须是「当前被选中的那个标签页」**，否则 Unity 会**静默接受请求却一个字节都不写**（Scene 视图被选中时就是这种情况）。所以完整条件是：**Unity 窗口在前台 + Game 是当前标签页**。切到 Game 视图时会补写最近一次捕获的图（属正常现象）。
+- 必须用公开 API，没有替代：`CaptureScreenshotAsTexture()` 自 2020.2a12 起禁止在非 Play Mode 调用；反射 GameView 内部结构太脆。
+- 分辨率 = Game 视图分辨率 × `--super-size`（1~4），不能任意指定。Game 视图开得小就出图糊——放大窗口或 `--super-size 2`。
+- 密集调用时有**偶发失败**（超时未落盘），重试一次通常就好；调用方需要带重试语义。
+
+**C10. `--bg "30,32,38,255"` 出来是白色？**
+`--bg` 收的是 **0~1 的浮点**（`prefab.screenshot` 与 `view.camera_create` 的 `bg` 都是），不是 0~255。超过 1 会被钳到 1 → 得到纯白。深色背景写 `--bg "0.1,0.11,0.13,1"`。省略则不填纯色（`prefab.screenshot` 默认透明、`view.camera_create` 默认渲染场景 Skybox）。
+
+**C11. 为什么 `prefab.create` 把实例存成了 Variant？**
+Unity 官方规定（`PrefabUtility.SaveAsPrefabAssetAndConnect`）：**输入对象若是 Prefab 实例的最外层根，生成的 Prefab 就是 Variant**（以原预制体为源）。想要独立预制体，得先在 Unity 里 Unpack。另外 `target` **不能是 Prefab 实例内部的子物体**（也只能传最外层根）。
+
+**C12. `pcreate` 之后场景里的物体怎么变成 Prefab 实例了？**
+默认行为如此（同 Unity 里把物体拖进 Project 窗口）。只想生成资产、场景物体保持普通物体，加 `--detach`。
 
 ## D. 命令相关的已知坑（bug 与约定）
 
@@ -89,6 +114,10 @@ prefab 资产内部物体名可能带首尾空格（如 `Tree_A_1.prefab` 里的
 
 **D10. `gameobject-set` 的 `--move/--rotate/--zoom` 与绝对参数混用时的顺序？**
 相对操作在**绝对设置（`--position/--rotation/--scale`）之后**执行，所以 `--position "0,0,0" --zoom "2,1,1"` 是先归零再放大。`--rotate` 四元数模式是**右乘**（`当前旋转 * 输入`，即先自身旋转再按输入旋转）；欧拉角模式是各分量直接相加。`--zoom` 是**相乘**（`"2,1,1"` = x 放大 2 倍），不是相加。
+
+**D11. 报「等待 Unity 响应超时」/「连接已被对端关闭」，但事后发现操作其实做成功了？**
+会出现。密集创建/删除资产时 Unity 忙于导入资源，命令排队执行会越过客户端超时；**客户端断开并不会取消已入队的命令**，所以出现「客户端报错、服务端已生效」。已知触发场景：连续 `pcreate` 建多个 Prefab。
+**约定：涉及资产创建的命令，超时后先核对结果（查磁盘/`ptree`/`tree`），再决定是否重试**；直接重试可能撞上「已存在，拒绝覆盖」。
 
 ## E. 环境与维护
 

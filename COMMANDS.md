@@ -2,7 +2,7 @@
 
 > 本文件是完整的命令参考；**使用方法、架构、配置见 `README.md`**。
 > 命令清单已对照源码（C# `[BridgeCommand]` 反射注册 + Python CLI 封装）逐一核对。
-> 版本：v1.15.0（48 条）｜整理日期：2026-09-10
+> 版本：v1.18.0（63 条）｜整理日期：2026-09-20
 
 ## 全局约定
 
@@ -47,27 +47,36 @@ python -m unity_bridge terrain-list --json
 | `debug.set_log_filter` | `debug-set-log-filter`（`dfilter`） | 设置日志过滤子串：**立即丢弃**当前缓冲中 message 不含该子串的日志，且后续仅 message 包含该子串的日志入缓冲；`substring`（位置参数，传空字符串清除过滤，不清空缓冲）；返回 `{filter, active, kept, removed}` |
 | `debug.log_version` | `debug-log-version`（`dlogv`） | Console 打印桥接层版本号（含命令总数） |
 
-## 三、相机与截图（4 条）
+## 三、相机与截图（5 条）
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
-| `prefab.screenshot` | `screenshot`（`shot`） | **隔离渲染**预制体/模型为 PNG（复制到 `(9999,9999,9999)`，摄后销毁）。相机定位二选一：`--offset "x,y,z"`（相对预制体，必填）或 `--camPos`/`--lookAt`（直接指定，`--relative` 切相对模式，`--lookAt` 缺省=预制体）。其它：`--orthographic`、`--fov`（透视=fov/正交=size）、`--width`（1920）、`--height`（1080）、`--bg "r,g,b[,a]"`（默认透明）、`--light`（补光强度，推荐 2） |
+| `prefab.screenshot` | `screenshot`（`shot`） | **隔离渲染**预制体/模型为 PNG（复制到 `(9999,9999,9999)`，摄后销毁）。相机定位二选一：`--offset "x,y,z"`（相对预制体，必填）或 `--camPos`/`--lookAt`（直接指定，`--relative` 切相对模式，`--lookAt` 缺省=预制体）。其它：`--orthographic`、`--fov`（透视=fov/正交=size）、`--width`（1920）、`--height`（1080）、`--bg "r,g,b[,a]"`（**0~1 浮点**，默认透明）、`--light`（补光强度，推荐 2） |
 | `prefab.billboard` | `prefab-billboard`（`billboard`、`pboard`） | 按 `--camera-position "x,y,z"` 指定的相机相对单位方向正交截取透明 PNG；`output` 必须是输出目录，相对路径基于 `Assets`；先计算投影 bounds，再按 `--pixels-per-meter`（默认 100）自动确定宽高；`--light` 控制与相机同向的平行光强度（默认 2，负数关闭）；输出文件名为预制体名 |
 | `view.camera` | `view-screenshot`（`vshot`） | 渲染**场景中指定相机的实时画面**为 PNG（不隔离、不创建临时物体）。`output`(.png)、`--camera`（省略时依次找 MainCamera → "Main Camera" → 第一个激活相机）、`--width`/`--height`（默认相机当前分辨率） |
+| `view.camera_create` | `view-camera-create`（`vcc`） | **临时新建一台相机**（位置/朝向任意）渲染**真实场景**并保存 PNG，截完立即销毁（不污染场景）。`output`(.png)、`--position`（世界坐标，默认 `0,0,0`）、`--rotation`（欧拉 `x,y,z`，`--quaternion` 时 `x,y,z,w`，默认 identity）、`--width`(1920)、`--height`(1080)、`--orthographic`、`--fov`（透视=fov/正交=size，缺省 Unity 默认）、`--bg "r,g,b[,a]"`（**0~1 浮点**，缺省渲染场景 Skybox）、`--light`（默认 0=用场景自身光照，>0 追加与相机同向平行光） |
 | `view.window` | `view-window`（`vwin`） | 抓 **Game 视图的最终呈现**（含 uGUI / UI Toolkit 的 **Overlay UI**）为 PNG。`output`(.png)、`--super-size`（分辨率倍数 1~4，默认 1；输出分辨率 = Game 视图分辨率 × 该值）、`--wait`（等待落盘秒数，默认 5） |
 
-> `prefab.screenshot` = 单资产隔离渲染（不依赖场景相机）；`view.camera` = 场景已有相机的实时画面；`view.window` = Game 视图合成后的最终画面。
-> ⚠️ `view.camera` / `view.camera_create` 走的是相机渲染，**相机看不见 Screen Space Overlay 的 uGUI Canvas 和 UI Toolkit 面板**——要截 UI 请用 `view.window`。
+> 四条截图命令的分工：`prefab.screenshot` = 单资产隔离渲染（不依赖场景相机）；`view.camera` = **复用场景已有相机**的实时画面；`view.camera_create` = **新造一台临时相机**从任意视点拍真实场景；`view.window` = Game 视图合成后的最终画面（唯一能截到 Overlay UI 的）。
+> ⚠️ `view.camera` / `view.camera_create` 走的是**相机渲染**，**相机看不见 Screen Space Overlay 的 uGUI Canvas 和 UI Toolkit 面板**——要截 UI 请用 `view.window`。
 > ⚠️ `view.window` 底层是 `ScreenCapture`，文件在**帧末异步落盘**，命令返回时文件可能还没生成（CLI 的 `view-window` 子命令已内置轮询等待）。
 > ⚠️ **Edit Mode 下必须让 Game 视图成为「当前选中的标签页」**，否则 Unity 会静默接受请求却不写文件（Scene 视图被选中时）；此时切到 Game 视图会补写最近一次捕获的图。**Scene 视图本身不支持截取**（公开 API 无法抓取）。
 
 
-## 四、场景与 Prefab 层级（3 条）
+## 四、场景操作与层级（6 条）
+
+> `scene.open` / `scene.new` / `scene.save` 是**场景文件操作**（会切换/写盘当前编辑的场景），
+> `scene.tree` / `scene.important_scripts` / `prefab.tree` 是**只读的层级查看**。
+> 场景命令的路径约定（强制）：必须传**完整项目相对路径**，以 `Assets/` 开头（如 `Assets/Scenes/Foo.unity`），
+> **不能只传文件名**；省略 `.unity` 后缀会自动补上。
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `scene.tree` | `tree` | 树状输出场景物体层级；**prefab 实例根不展开内部，备注资产路径**（`(prefab: Assets/...)`）；`--depth`（遍历深度，根算第 1 层，默认 1 只显示起点本身）、`--path`（扫描起点，层级路径如 `MainCamera/Object1` 或唯一名称，省略=整个场景；起点为 prefab 实例内部时报错并返回 prefab 根场景路径+资产路径）、`--components`（同时显示组件类型）、`--json`（原始数据，prefab 根含 `"prefab"` 字段，指定起点时含 `"startPath"` 字段） |
 | `scene.important_scripts` | `important-scripts`（`impscripts`、`imps`） | 列出场景中挂有"重要脚本"的物体；匹配规则取 `bridge.ini` 的 `[scene] important_suffix`（逗号分隔的类名后缀，默认 `Manager, Tool`，忽略大小写）；扫描范围含未激活物体（`active` 标注实际状态）；返回 `suffix`（生效规则）、`scripts`（`path` 层级路径 / `name` 脚本名 / `active`） |
+| `scene.open` | 无专用子命令（`client.call("scene.open")` / 原始 TCP） | **加载（打开）一个已存在的场景**（关闭其它场景）。`path`(必填,完整路径如 `Assets/Scenes/Foo.unity`)；文件不存在报错；返回 `{name, path, isLoaded}` |
+| `scene.new` | 无专用子命令（`client.call("scene.new")` / 原始 TCP） | **新建空白场景并立即保存到指定路径**（创建即落盘，关闭其它场景）。`path`(必填,完整路径)；**已存在则拒绝覆盖**（防误删）；返回 `{name, path, isLoaded}` |
+| `scene.save` | 无专用子命令（`client.call("scene.save")` / 原始 TCP） | **保存当前活动场景**。`path`(可选)：**省略=就地保存**（当前场景从未保存过则报错并提示传 path）；**传入=另存为**（完整路径）；返回 `{saved, path, message}` |
 | `prefab.tree` | `prefab-tree`（`ptree`、`pt`） | 以树状结构返回 **prefab 资产内部**的物体层级（类似 scene.tree，但扫描对象是 Assets 下的 prefab）；`path`（**必填**，Assets 相对路径，可带或不带 `Assets/` 前缀，.prefab 或模型文件）、`--depth`（根算第 1 层，默认 `-1`=完整展开）、`--components`、`--json`；嵌套 prefab 实例根同样不展开并备注资产路径 |
 
 ## 五、网格与资源（2 条）
@@ -79,7 +88,7 @@ python -m unity_bridge terrain-list --json
 
 ## 六、物体操作（4 条）
 
-> `gameobject.instantiate` / `gameobject.destroy` 与下文的 Prefab 资产内部编辑 3 条，原为 workflow 仓库的通用命令，现已提升为 bridge 原生命令（位于 bridge 仓库 `Runtime/Commands/`）。
+> `gameobject.instantiate` / `gameobject.destroy` 与[第七章](#七prefab-资产编辑8-条)的 Prefab 资产编辑命令，原为 workflow 仓库的通用命令，现已提升为 bridge 原生命令（位于 bridge 仓库 `Runtime/Commands/`）。
 
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
@@ -124,7 +133,7 @@ python -m unity_bridge terrain-list --json
 
 > **公共参数**：`terrain`(可选) —— 目标 Terrain 名称，省略取场景第一个；区域参数 `xBase`/`zBase`/`width`/`height`(可选) —— 操作区域，省略默认整图。
 
-### 7a. 信息查询（4）
+### 8a. 信息查询（4）
 | 服务端命令 | CLI（别名） | 关键参数 / 说明 |
 |---|---|---|
 | `terrain.list` | `terrain-list`（`tlist`） | 列出所有 Terrain（位置/尺寸/各分辨率/层数/树数） |
@@ -132,29 +141,29 @@ python -m unity_bridge terrain-list --json
 | `terrain.list_details` | `terrain-list-details`（`tdlist`） | 列出草原型（DetailPrototype） |
 | `terrain.list_trees` | `terrain-list-trees`（`ttlist`） | 列出树原型 + 全部树实例（位置/缩放） |
 
-### 7b. 高度图（2）
+### 8b. 高度图（2）
 | `terrain.get_heights` | `terrain-get-heights`（`tget`） | 读区域高度（0~1，行优先 `index=y*width+x`） |
 | `terrain.set_heights` | `terrain-set-heights`（`tset`） | 写高度：`--data`（float[] 行优先 0~1）**或** `--noise` Perlin 噪声（`--noiseScale/--noiseSeed/--baseHeight/--heightScale`，可复现） |
 
-### 7c. 纹理混合（2）
+### 8c. 纹理混合（2）
 | `terrain.get_alphamaps` | `terrain-get-alphamaps`（`tamap`） | 读混合权重（`index=(y*width+x)*layers+layer`） |
 | `terrain.set_alphamaps` | `terrain-set-alphamaps`（`tsamap`） | 写混合权重（**每像素自动归一化**）；`--data`(float[]) |
 
-### 7d. 植被 Detail（2）
+### 8d. 植被 Detail（2）
 | `terrain.get_details` | `terrain-get-details`（`tdget`） | 读某层植被密度图；`--layer` |
 | `terrain.set_details` | `terrain-set-details`（`tdset`） | 写密度：`--data`（int[] 0~16）**或** `--random --count --seed --density` 撒点；`--layer` |
 
-### 7e. 树木（2）
+### 8e. 树木（2）
 | `terrain.add_trees` | `terrain-add-trees`（`ttadd`） | 加树：`--positions`（每 3 个一组 {x,y,z} 归一化 0~1，自动贴地）**或** `--random --count --seed --minScale --maxScale`；`--prototypeIndex` |
 | `terrain.clear_trees` | `terrain-clear-trees`（`ttclear`） | 清空所有树实例 |
 
-### 7f. 快照 stash（4）
+### 8f. 快照 stash（4）
 | `terrain.stash` | `terrain-stash`（`tstash`） | trees/details/all 全量存 JSON 到 `Assets/unity-python-bridge/stash/{trees\|details}/<name>.json`；`--type`（默认 all）、`--name`（必填，**同名报错不允许覆盖**） |
 | `terrain.apply_stash` | `terrain-apply-stash`（`tapply`） | 读 JSON **整体写回**地形（替换当前内容；原型数/分辨率不匹配拒绝）；`--type`、`--name` |
 | `terrain.stash_delete` | `terrain-stash-delete`（`tstashdel`） | 删除快照；`--type`（trees/details）、`--name` |
 | `terrain.stash_list` | `terrain-stash-list`（`tstashlist`） | 列出快照；`--type`（默认 all） |
 
-### 7g. 资源目录审计（3）
+### 8g. 资源目录审计（3）
 | `terrain.get_diffuse_dirs` | `terrain-get-diffuse-dirs`（`tdiff`） | TerrainLayer 的 Diffuse 贴图**目录（去重）** + 各层完整路径 |
 | `terrain.get_tree_prefab_dirs` | `terrain-get-tree-prefab-dirs`（`ttpd`） | 树原型 Prefab 目录（去重）+ 各原型路径 |
 | `terrain.get_detail_asset_dirs` | `terrain-get-detail-asset-dirs`（`tdad`） | 草原型的 prefab/贴图目录（去重）+ 各原型路径 |
@@ -190,7 +199,7 @@ python -m unity_bridge terrain-list --json
 | `property.set` | `property-set`（`pset`） | 按名**写入属性/字段**（支持 Undo；**资产目标会 SaveAssets 落盘**）。`target`、`--component`(可选，省略=对 target 本身操作)、`--property`(属性名 / 字段名 / `m_Xxx` 序列化字段)、`--value`。值按成员真实类型自动转换：bool 收 `true/false/1/0`；枚举收名字；`Vector`/`Color` 收 `"x,y,z"`；**引用类型收 Assets 路径**；字面量 `null` 置空。返回 `memberKind`(property/field/serialized) 与实际写入值 |
 | `asset.create` | `asset-create`（`acreate`） | 反射创建 **ScriptableObject 资产**（如 `PanelSettings`）。`type`(简名或全名)、`--path`(必须 `Assets/` 开头)、`--overwrite`(默认拒绝覆盖并报错) |
 
-### 用这 4 条搭一套 UI Toolkit 载体（完整示例）
+### 用这几条搭一套 UI Toolkit 载体（完整示例）
 ```bash
 python -m unity_bridge acreate PanelSettings --path "Assets/UI/UITestPanelSettings.asset"
 python -m unity_bridge pset "Assets/UI/UITestPanelSettings.asset" --property themeStyleSheet --value "Assets/UI Toolkit/UnityThemes/UnityDefaultRuntimeTheme.tss"
@@ -201,7 +210,7 @@ python -m unity_bridge pset UITest --component UIDocument --property visualTreeA
 python -m unity_bridge view-window out/ui.png
 ```
 
-> uGUI 的 `Canvas` / `CanvasScaler` / `Image` / `EventSystem` 同样用这 4 条即可搭起来，不需要手工摆放。
+> uGUI 的 `Canvas` / `CanvasScaler` / `Image` / `EventSystem` 同样用这几条即可搭起来（`gcreate` + `cadd` + `pset`），不需要手工摆放。
 >
 > ⚠️ 默认运行时主题由 Unity 自动创建：只要 `asset.create` 建出 `PanelSettings`，Unity 就会在同一步生成
 > `Assets/UI Toolkit/UnityThemes/UnityDefaultRuntimeTheme.tss`（**注意带 `UnityThemes/` 子目录**），
@@ -245,8 +254,10 @@ python -m unity_bridge ptree "Assets/Prefabs/Tree.prefab"
 ```bash
 # 隔离渲染单资产（相机位置/观察点直接指定）
 python -m unity_bridge screenshot Assets/Prefabs/Tree.prefab out/tree.png --offset "0,0,0" --camPos "5,3,8" --lookAt "0,0,0" --light 2
-# 抓场景相机实时画面（相机看不见的 Overlay UI 不会出现在这张图里）
+# 抓场景已有相机的实时画面（相机看不见的 Overlay UI 不会出现在这张图里）
 python -m unity_bridge view-screenshot out/game.png
+# 临时造一台相机从任意视点拍真实场景（不改动场景里的相机）
+python -m unity_bridge vcc out/from_top.png --position "0,20,0" --rotation "90,0,0" --light 2
 # 抓 Game 视图最终呈现——评审 uGUI / UI Toolkit 界面用这个（含 Overlay UI）
 python -m unity_bridge view-window out/ui.png
 python -m unity_bridge view-window out/ui_2x.png --super-size 2   # 两倍分辨率，便于看细节
@@ -280,10 +291,20 @@ python -m unity_bridge gameobject-set "Player/Body" --zoom "2,1,1"     # 相对�
 python -m unity_bridge gameobject-set "Player/Body" --position "0,0,0" --zoom "0.5,0.5,0.5"
 ```
 
+### 场景文件操作（新建 / 打开 / 保存）
+```bash
+python -c "from unity_bridge import UnityClient; UnityClient().call('scene.new',  path='Assets/Scenes/Level2.unity')"   # 新建空场景并落盘（已存在则拒绝）
+python -c "from unity_bridge import UnityClient; UnityClient().call('scene.open', path='Assets/Scenes/Level2.unity')"   # 打开已存在的场景
+python -c "from unity_bridge import UnityClient; UnityClient().call('scene.save')"                                      # 就地保存当前场景
+python -c "from unity_bridge import UnityClient; UnityClient().call('scene.save', path='Assets/Scenes/Level2_copy.unity')"  # 另存为
+```
+> 这三条**没有 CLI 子命令**（只有 `scene.tree` 等只读命令有），用 `client.call` 或原始 TCP 调用。
+> 路径必须完整（`Assets/` 开头），只传文件名会报错；`.unity` 后缀可省略。
+
 ### 自诊断（日志读回 + 重编译）
 ```bash
 python -m unity_bridge debug-logs --type error --count 20   # 读最近 20 条错误（含 stackTrace）
-python -m unity_bridge reload --expect-version 1.13.0        # 改完 C# 后触发重编译并等待恢复
+python -m unity_bridge reload --expect-version 1.18.0        # 改完 C# 后触发重编译并等待恢复（不匹配会继续等）
 ```
 
 ### Play Mode 控制（开始 / 暂停 / 恢复 / 停止）

@@ -4,7 +4,7 @@
 
 **纯 Unity 原生实现**：C# 侧仅使用 Unity 内置 `JsonUtility`（无 Newtonsoft.Json），Python 侧仅使用标准库——**克隆/复制整个仓库文件夹到任意项目的 `Assets/` 下即可使用**，无需安装任何包。
 
-> 📖 **完整命令列表见 [`COMMANDS.md`](COMMANDS.md)**（47 条，按功能分类：系统 / 调试 / 相机截图 / 场景与 Prefab 层级 / 网格与资源 / 物体操作 / Prefab 资产内部编辑 / 地形 / 编辑器控制；含全部参数与示例）。本 README 只讲架构、连接、配置与用法。
+> 📖 **完整命令列表见 [`COMMANDS.md`](COMMANDS.md)**（63 条，按功能分类：系统 / 调试 / 相机截图 / 场景操作与层级 / 网格与资源 / 物体操作 / Prefab 资产编辑 / 地形 / 编辑器控制 / 构建类；含全部参数与示例）。本 README 只讲架构、连接、配置与用法。
 
 ## 📚 文档导航（按需阅读）
 
@@ -12,7 +12,7 @@
 |---|---|---|
 | [`GETTING_STARTED.md`](GETTING_STARTED.md) | **第一次接触**（读一遍即可） | 环境前置、一分钟速览、安装三步验证、排障速查、术语表、命令影响边界、升级、安全边界 |
 | [`README.md`](README.md)（本文） | 想深入理解 | 架构总览、快速开始、连接与配置（端口/超时/bridge.ini/服务器生命周期/reload）、扩展命令、协议参考 |
-| [`COMMANDS.md`](COMMANDS.md) | **用命令时** | 47 条命令的完整参考：服务端命令名、CLI 别名、全部参数、常用工作流 |
+| [`COMMANDS.md`](COMMANDS.md) | **用命令时** | 63 条命令的完整参考：服务端命令名、CLI 别名、全部参数、常用工作流 |
 | [`FAQ.md`](FAQ.md) | **遇到问题 / 已知坑** | 连接、编译 reload、命令使用、命令相关 bug、环境维护的常见问题 |
 
 > 建议路径：新手先读 GETTING_STARTED 一次 → 用命令查 COMMANDS → 出问题查 FAQ → 需要原理再回来看本文。
@@ -100,6 +100,20 @@ python -m unity_bridge gameobject-set "Player/Body" --position "10,0,5" --scale 
 python -m unity_bridge gameobject-set "Player/Body" --move "0,10,0"        # 位置 += (0,10,0)
 python -m unity_bridge gameobject-set "Player/Body" --rotate "0,90,0"      # 欧拉角各分量相加
 python -m unity_bridge gameobject-set "Player/Body" --zoom "2,1,1"         # x 轴放大 2 倍
+
+# 从零造物：空物体 / 原生几何体 / 加组件 / 写属性 / 建 ScriptableObject 资产
+python -m unity_bridge gcreate Tree --position "0,0,0"
+python -m unity_bridge gprim Cylinder --name Trunk --target Tree --material "Assets/Art/Mat/Black.mat"
+python -m unity_bridge cadd Tree --component BoxCollider
+python -m unity_bridge pset Tree --component BoxCollider --property center --value "0,1,0"
+python -m unity_bridge acreate PanelSettings --path "Assets/UI/MyPanelSettings.asset"
+
+# 场景物体 → Prefab 资产 → 复用（v1.18.0）
+python -m unity_bridge pcreate Tree --path "Assets/Prefabs/Tree.prefab"     # 默认场景物体会变成该 Prefab 的实例
+python -m unity_bridge pcreate Tree --path "Assets/Prefabs/Tree.prefab" --detach   # 只生成资产，场景物体保持普通物体
+
+# 截图：相机看不见 Overlay UI，评审界面请用 view-window（需 Game 视图为当前标签页）
+python -m unity_bridge view-window out/ui.png --super-size 2
 ```
 
 ### 2.1 MCP 适配器（可选）
@@ -190,7 +204,7 @@ important_suffix = Manager, Tool  ; scene.important_scripts 的重要脚本匹�
 python -m unity_bridge reload
 
 # 指定期望版本（不匹配则继续等待）、自定义超时与轮询间隔
-python -m unity_bridge reload --expect-version 1.13.0 --timeout 180 --interval 2
+python -m unity_bridge reload --expect-version 1.18.0 --timeout 180 --interval 2
 ```
 
 - **原理**：`bridge.reload` 先持久化"运行中"状态，再延迟一帧调用 `CompilationPipeline.RequestScriptCompilation()` 触发重编译；重编译（domain reload）完成后由 BridgeAutoRestart 自动恢复服务器，客户端轮询版本号直到恢复。
@@ -201,16 +215,16 @@ python -m unity_bridge reload --expect-version 1.13.0 --timeout 180 --interval 2
 
 ## 四、命令列表
 
-**完整命令列表（47 条，按功能分类：系统 4 / 调试 5 / 相机截图 3 / 场景与 Prefab 层级 3 / 网格与资源 2 / 物体操作 4 / Prefab 资产内部编辑 3 / 地形编辑 19 / 编辑器控制 4）见 [`COMMANDS.md`](COMMANDS.md)**，含：服务端命令名、Python CLI 与别名、全部参数、常用工作流示例。
+**完整命令列表（63 条，按功能分类：系统与连通 4 / 调试与日志 6 / 相机与截图 5 / 场景操作与层级 6 / 网格与资源 2 / 物体操作 4 / Prefab 资产编辑 8 / 地形编辑 19 / 编辑器 Play Mode 控制 4 / 构建类 5）见 [`COMMANDS.md`](COMMANDS.md)**，含：服务端命令名、Python CLI 与别名、全部参数、常用工作流示例。
 
 快速导航：
 
 | 类别 | 说明 | 代表命令 |
 |---|---|---|
 | 系统与连通 | 连通测试 / 列命令 / 版本 / 触发重编译 | `bridge.ping` `bridge.reload` |
-| 调试与日志 | 打日志、读回日志、打印版本 | `debug.get_logs` `debug.log_version` |
-| 相机与截图 | 隔离渲染资产、自动尺寸 billboard、抓相机实时画面、抓 Game 视图最终呈现 | `prefab.screenshot` `prefab.billboard` `view.camera` `view.window` |
-| 场景与 Prefab 层级 | 场景物体树（prefab 备注资产路径）/ 重要脚本 / prefab 资产内部层级 | `scene.tree` `scene.important_scripts` `prefab.tree` |
+| 调试与日志 | 打日志、读回日志（可按子串过滤）、打印版本 | `debug.get_logs` `debug.set_log_filter` `debug.log_version` |
+| 相机与截图 | 隔离渲染资产、自动尺寸 billboard、场景相机实时画面、临时相机任意视点、Game 视图最终呈现（含 Overlay UI） | `prefab.screenshot` `prefab.billboard` `view.camera` `view.camera_create` `view.window` |
+| 场景操作与层级 | 新建/打开/保存场景；场景物体树（prefab 备注资产路径）/ 重要脚本 / prefab 资产内部层级 | `scene.new/open/save` `scene.tree` `scene.important_scripts` `prefab.tree` |
 | 网格与资源 | 网格/预制体完整变换包围盒 | `mesh.bounds` `prefab.bounds` |
 | 物体操作 | 读写 active/transform；相对操作 move/rotate/zoom；场景实例化/销毁（支持 Undo） | `gameobject.get/set/instantiate/destroy` |
 | 构建类 | 建空物体、建原生几何体、加组件、按名写属性/字段、反射创建 ScriptableObject 资产 | `gameobject.create` `gameobject.create_primitive` `component.add` `property.set` `asset.create` |
@@ -303,9 +317,11 @@ public static object MethodName(BridgeContext ctx, BridgeArgs args)
 unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 ├── README.md                       # 本文档：架构/连接/配置/扩展/协议 + 文档导航
 ├── GETTING_STARTED.md              # 新手入门（读一遍即可）：环境/安装验证/术语/影响边界/安全
-├── COMMANDS.md                     # 完整命令列表（47 条，含参数与示例）
+├── COMMANDS.md                     # 完整命令列表（63 条，含参数与示例）
 ├── FAQ.md                          # 常见问题与已知坑（连接/编译/命令/bug/环境）
-├── bridge.ini                      # 运行时配置：端口 [server] port / 重编译超时 [reload] timeout
+├── bridge.ini                      # 运行时配置：端口 [server] port / 重编译超时 [reload] timeout / 重要脚本后缀 [scene] important_suffix
+├── .gitignore                      # 忽略 __pycache__ / .vscode / out 等临时产物
+├── Art/Mat/                        # 测试用纯色材质（11 个：Black/Blue/Green/LightBlue/…/Yellow），供 --material 参数使用
 ├── Editor/                         ← 纯编辑器工具（Editor 程序集，不进 Player）
 │   ├── BridgeManagerInspector.cs   # BridgeManager 的 Inspector 按钮 + Tools 菜单快捷入口
 │   └── BridgeAutoRestart.cs        # 服务器状态持久化 + 重编译后自动恢复 + 端口自愈 watchdog（时机管理）
@@ -320,6 +336,7 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │   ├── MainThreadRunner.cs         # 主线程执行队列
 │   └── Commands/
 │       ├── SceneTreeCommand.cs     # 命令 scene.tree（场景层级树，depth/path/prefab 折叠）+ scene.important_scripts（重要脚本检索，规则读 ini）+ prefab.tree（prefab 资产内部层级树，path 必填）
+│       ├── SceneCommands.cs        # 命令 scene.open / scene.new / scene.save（场景文件操作：打开/新建即落盘/保存或另存为）
 │       ├── MeshBoundsCommand.cs    # 命令 mesh.bounds（包围盒计算）
 │       ├── PrefabScreenshotCommand.cs  # 命令 prefab.screenshot（隔离复制+相机截图，支持 camPos/lookAt）
 │       ├── PrefabBillboardCommand.cs   # 命令 prefab.billboard（自动尺寸正交 billboard）+ prefab.bounds（prefab 内完整变换世界 AABB）
@@ -327,23 +344,27 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 │       ├── PrefabObjectCommands.cs # 命令 prefab.create（场景物体存成 Prefab 资产）/ prefab.create_object / prefab.create_primitive / prefab.add_component / prefab.set（Prefab 内部建物体与几何体、加组件、写属性）
 │       ├── TerrainCommands.cs      # 命令 terrain.*（高度图/纹理/植被/树木/快照/资源目录审计，Unity 原生 TerrainData）
 │       ├── TerrainStashCommands.cs # 命令 terrain.stash / apply_stash / stash_delete / stash_list（快照 JSON）
-│       ├── ViewScreenshotCommand.cs # 命令 view.camera（抓取指定相机实时画面）
+│       ├── ViewScreenshotCommand.cs # 命令 view.camera（抓取场景中指定相机的实时画面）
+│       ├── ViewCameraCreateCommand.cs # 命令 view.camera_create（临时新建相机，从任意视点渲染真实场景后立即销毁）
 │       ├── ViewWindowCommand.cs    # 命令 view.window（抓 Game 视图最终呈现，含 Overlay UI；ScreenCapture 帧末异步落盘）
-│       ├── GameObjectCommands.cs   # 命令 gameobject.get / gameobject.set / gameobject.create / gameobject.instantiate / gameobject.destroy（active/position/rotation/scale + 相对操作 move/rotate/zoom；新建空物体、场景实例化/销毁，支持 Undo）
+│       ├── GameObjectCommands.cs   # 命令 gameobject.get / gameobject.set / gameobject.create / gameobject.create_primitive / gameobject.instantiate / gameobject.destroy（active/position/rotation/scale + 相对操作 move/rotate/zoom；新建空物体与原生几何体、场景实例化/销毁，支持 Undo）
 │       ├── BuildCommands.cs        # 命令 component.add / property.set / asset.create（加组件、按名写属性/字段、反射创建 ScriptableObject 资产——搭 UI 载体用）
 │       ├── SystemCommands.cs       # bridge.ping / bridge.list_commands / bridge.version / bridge.reload
 │       ├── EditorCommands.cs       # editor.play / editor.stop / editor.pause / editor.unpause（Play Mode 控制）
-│       └── DebugCommands.cs        # debug.log / log_warning / log_error / get_logs / log_version
-└── python/                         # Python 侧（无需安装依赖）
+│       └── DebugCommands.cs        # debug.log / log_warning / log_error / get_logs / set_log_filter / log_version
+└── python/                         # Python 侧（CLI 与 UnityClient 零依赖；MCP 入口需装 requirements）
     ├── unity_bridge/
     │   ├── __init__.py
     │   ├── config.py               # 读取 bridge.ini（端口/超时默认值，CLI 与 client 共用）
-    │   ├── client.py               # TCP/JSON 客户端 UnityClient
-    │   ├── cli.py                  # 命令行入口（tree / list / bounds / billboard / screenshot / terrain / reload / debug）
+    │   ├── client.py               # TCP/JSON 客户端 UnityClient（含全部命令的封装方法）
+    │   ├── cli.py                  # 命令行入口（tree / list / bounds / billboard / screenshot / view-* / gcreate / gprim / pset / pcreate / terrain / reload / debug）
+    │   ├── mcp_server.py           # 可选 MCP stdio 服务（12 个工具：强类型 + list/call 网关）
     │   └── __main__.py             # 支持 python -m unity_bridge
     ├── scripts/
-    │   └── mock_unity_server.py    # 模拟 Unity 侧协议，无 Unity 也能联调
-    └── requirements.txt
+    │   ├── mock_unity_server.py    # 模拟 Unity 侧协议，无 Unity 也能联调
+    │   ├── test_mcp_smoke.py       # MCP 端到端冒烟测试（握手/工具发现/真实 Unity 调用）
+    │   └── test_terrain_alphamap.py # 地形混合权重相关测试脚本
+    └── requirements.txt            # 仅 MCP 入口需要（原有 CLI 无需安装）
 ```
 
 ---
@@ -356,4 +377,4 @@ unity-python-bridge/                ← 复制/克隆到 Assets/ 下即用
 - 若要在打包后的 Player 中使用，请自行评估：本项目针对 **Editor 开发期工具** 场景。
 - **首次导入后**：Unity 会为脚本生成 `.meta` 文件（GUID）。若希望跨项目复制时保持 GUID 稳定（推荐），请把生成的 `.meta` 一并提交到 git。
 - **自动化编译**：`bridge.reload` 是进程内 API，可稳定触发重编译（需 Unity 前台）；**模拟鼠标点击对 Unity 编辑器无效**（编辑器忽略注入输入），不要走那条路。
-- **版本演进**（当前 v1.18.0）：v1.0.0=独立重构（JsonUtility，5 条命令）→ v1.1.0=新增 12 条 terrain 命令 → v1.2.0=修复 list_commands 序列化 + 版本工具 → v1.3.0=新增 terrain.stash 四命令、view.camera、gameobject.get/set → v1.4.0=新增 debug.get_logs → v1.5.0=新增 debug.log_version → v1.6.0=版本号维护 → v1.7.0=服务器重复启动/停止打印 Warning → v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标 → v1.9.0=新增 scene.important_scripts → v1.10.0=scene.tree 遇到 prefab 实例根不展开 → v1.11.0=scene.tree 新增 depth/path → v1.12.0=新增 prefab.tree → v1.13.0=gameobject.set 新增相对操作 → v1.14.0=新增 prefab.bounds 与自动尺寸正交 prefab.billboard → v1.14.1=prefab.billboard 默认添加强度 2 的相机同向平行光并支持 light 参数 → v1.14.2=新增 editor.play/editor.stop/editor.pause/editor.unpause（Play Mode 控制，纯 Editor API，bridge 仓库通用能力）→ v1.15.0=新增 view.window（抓 Game 视图最终呈现，含 uGUI / UI Toolkit 的 Overlay UI）与 debug.set_log_filter（按子串过滤日志缓冲，传空清除过滤）→ v1.16.0=新增构建类命令 4 条（gameobject.create / component.add / property.set / asset.create，让 UI 载体能全自动搭起来）→ v1.17.0=新增 Prefab 内部对象级编辑 4 条（prefab.create_object / create_primitive / add_component / set）与 gameobject.create_primitive（场景内建原生几何体）→ v1.18.0=新增 prefab.create（场景物体另存为 Prefab 资产，父目录自动创建；默认场景物体变为该 Prefab 的实例）。可用 `python -m unity_bridge version` 或 `debug-log-version` 确认当前版本。
+- **版本演进**（当前 v1.18.0）：v1.0.0=独立重构（JsonUtility，5 条命令）→ v1.1.0=新增 12 条 terrain 命令 → v1.2.0=修复 list_commands 序列化 + 版本工具 → v1.3.0=新增 terrain.stash 四命令、view.camera、gameobject.get/set → v1.4.0=新增 debug.get_logs → v1.5.0=新增 debug.log_version → v1.6.0=版本号维护 → v1.7.0=服务器重复启动/停止打印 Warning → v1.8.0=prefab.screenshot 支持直接指定相机位置与观察目标 → v1.9.0=新增 scene.important_scripts → v1.10.0=scene.tree 遇到 prefab 实例根不展开 → v1.11.0=scene.tree 新增 depth/path → v1.12.0=新增 prefab.tree → v1.13.0=gameobject.set 新增相对操作 → v1.14.0=新增 prefab.bounds 与自动尺寸正交 prefab.billboard → v1.14.1=prefab.billboard 默认添加强度 2 的相机同向平行光并支持 light 参数 → v1.14.2=新增 editor.play/editor.stop/editor.pause/editor.unpause（Play Mode 控制，纯 Editor API，bridge 仓库通用能力）**以及 scene.open / scene.new / scene.save 与 view.camera_create**（场景文件操作与临时相机截图；该次提交未单独升版本号，故并入本条目）→ v1.15.0=新增 view.window（抓 Game 视图最终呈现，含 uGUI / UI Toolkit 的 Overlay UI）与 debug.set_log_filter（按子串过滤日志缓冲，传空清除过滤）→ v1.16.0=新增构建类命令 4 条（gameobject.create / component.add / property.set / asset.create，让 UI 载体能全自动搭起来）→ v1.17.0=新增 Prefab 内部对象级编辑 4 条（prefab.create_object / create_primitive / add_component / set）与 gameobject.create_primitive（场景内建原生几何体）→ v1.18.0=新增 prefab.create（场景物体另存为 Prefab 资产，父目录自动创建；默认场景物体变为该 Prefab 的实例）。可用 `python -m unity_bridge version` 或 `debug-log-version` 确认当前版本。
