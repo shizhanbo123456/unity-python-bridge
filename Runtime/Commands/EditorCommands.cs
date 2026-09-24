@@ -81,7 +81,8 @@ namespace UnityPythonBridge.Commands
         private static void ExitPlayMode()
         {
 #if UNITY_2019_1_OR_NEWER
-            if (EditorApplication.isPlaying && !EditorApplication.isPlayingOrWillChangePlaymode)
+            // 注意：isPlayingOrWillChangePlaymode 在 Play 中同样为 true，不能作为"正在切换"的判断
+            if (EditorApplication.isPlaying)
                 EditorApplication.ExitPlaymode();
 #else
             EditorApplication.isPlaying = false;
